@@ -36,6 +36,18 @@ class AccessToken(db.Model):
   token = db.Column(db.String(util.ACCESS_TOKEN_LENGTH), primary_key=True)
   timestamp = db.Column(db.DateTime, nullable=False)
 
+class MessageFragment(db.Model):
+  id = db.Column(db.Integer, primary_key=True)
+  text = db.Column(db.String(200), nullable=False)
+
+class Message(db.Model):
+  id = db.Column(db.Integer, primary_key=True)
+
+class MessageAndFragment(db.Model):
+  message_id = db.Column(db.Integer, primary_key=True, foreign_key=Message.id)
+  fragment_id = db.Column(db.Integer, primary_key=True, foreign_key=MessageFragment.id)
+  fragment = db.relationship("MessageFragment")
+
 
 # Login
 
@@ -68,3 +80,31 @@ def close_login_request(email, secret_key):
   db.session.add(AccessToken(email=email, token=token, timestamp=util.now()))
   db.session.commit()
   return token
+
+def new_message(text):
+  message_id = util.new_id()
+  fragment_id = util.new_id()
+  db.session.add(Message(id=message_id))
+  db.session.add(MessageFragment(id=fragment_id))
+  db.session.add(MessageAndFragment(message_id=message_id, fragment_id=fragment_id))
+  db.session.commit()
+  return message_id
+
+def append_message(old_message_id, text):
+  new_message_id = util.new_id()
+  new_fragment_id = util.new_id()
+  fragment_ids = db.session.query(MessageAndFragment).filter(MessageAndFragment.message_id == old_message_id).all()
+  fragment_ids.append(new_fragment_id)
+  db.session.add(Message(id=new_message_id))
+  db.session.add(MessageFragment(id=new_fragment_id))
+  for frag_id in fragment_ids:
+    db.session.add(MessageAndFragment(message_id=new_message_id, fragment_id=frag_id))
+  db.session.commit()
+  return new_message_id
+
+def get_message(message_id):
+  fragments = db.session.query(MessageAndFragment.fragment).filter(MessageAndFragment.message_id == message_id).all()
+  return [f.text for f in fragments]
+
+
+

@@ -1,6 +1,8 @@
 import string
 import random
 import datetime
+import time
+
 
 SECRET_KEY_LENGTH = 6
 SECRET_KEY_CHARS = string.ascii_uppercase + string.digits
@@ -21,3 +23,6 @@ def generate_access_token():
 
 def now():
   return datetime.datetime.utcnow()
+
+def new_id():
+  return time.time_ns()
