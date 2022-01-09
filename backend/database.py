@@ -27,7 +27,7 @@ class User(db.Model):
 
 class PendingLoginRequest(db.Model):
   email = db.Column(db.String(120), db.ForeignKey(User.email), primary_key=True)
-  secret_key = db.Column(db.String(10), nullable=False)
+  secret_key = db.Column(db.String(util.SECRET_KEY_LENGTH), nullable=False)
   timestamp = db.Column(db.DateTime, nullable=False)
 
 
@@ -62,7 +62,7 @@ def close_login_request(email, secret_key):
       PendingLoginRequest.secret_key == secret_key.upper(),
       PendingLoginRequest.timestamp > util.now() - VALID_LOGIN_ATTEMPT_DELTA)
   if attempt_query.count() != 1:
-    raise ValueError(f"Login attempt failed for email: {email}")
+    raise ValueError("Invalid secret key")
   attempt_query.delete()
   token = util.generate_access_token()
   db.session.add(AccessToken(email=email, token=token, timestamp=util.now()))

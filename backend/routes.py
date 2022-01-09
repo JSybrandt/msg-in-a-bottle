@@ -19,11 +19,11 @@ def value_error(e):
 @blueprint.route("/login", methods=["POST"])
 def login():
   if not request.is_json:
-    raise ValueError("/login expected json-encoded post.")
+    raise ValueError("Expected json-encoded post")
   data = request.get_json()
   email = data.get("email")
   if email is None:
-    raise ValueError("/login expected 'email' parameter.")
+    raise ValueError("Expected 'email' value")
   secret_key = data.get("secret_key")
   if secret_key is None:
     new_key = database.open_login_request(email)

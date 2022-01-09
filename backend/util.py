@@ -2,7 +2,7 @@ import string
 import random
 import datetime
 
-SECRET_KEY_LENGTH = 5
+SECRET_KEY_LENGTH = 6
 SECRET_KEY_CHARS = string.ascii_uppercase + string.digits
 
 ACCESS_TOKEN_LENGTH = 20

@@ -5,4 +5,4 @@ format:
 	pipenv run yapf --style yapf -i *.py
 
 test:
-	pipenv run python3 -m unittest
+	pipenv run python3 -m unittest -v
