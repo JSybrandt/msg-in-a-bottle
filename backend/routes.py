@@ -1,17 +1,19 @@
-from flask import request, jsonify
+from flask import request, jsonify, Blueprint
 import util
 import database
-import server
+import mail
 
-@server.app.errorhandler(ValueError)
+blueprint = Blueprint("main_blueprint", __name__)
+
+@blueprint.errorhandler(ValueError)
 def value_error(e):
   return jsonify(error=str(e)), 400
 
-@server.app.errorhandler(AssertionError)
+@blueprint.errorhandler(AssertionError)
 def value_error(e):
   return jsonify(error=str(e)), 500
 
-@server.app.route("/login", methods=["POST"])
+@blueprint.route("/login", methods=["POST"])
 def login():
   if not request.is_json:
     raise ValueError("/login expected json-encoded post.")
@@ -22,7 +24,7 @@ def login():
   secret_key = data.get("secret_key")
   if secret_key is None:
     new_key = database.open_login_request(email)
-    server.send_mail(
+    mail.send_mail(
       "Msg in a Bottle: Temporary Password",
       f"Your temporary password is: {new_key}",
       [email])

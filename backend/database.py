@@ -1,7 +1,17 @@
-from server import db, DATABASE_PATH
 from sqlalchemy.sql import func
 import util
 from datetime import datetime, timedelta
+from flask_sqlalchemy import SQLAlchemy
+
+# The user of this module will need to init this.
+db = SQLAlchemy()
+
+DATABASE_URI=f"sqlite:///msg-in-a-bottle.sqlite.db"
+
+def init_app(app, config_overwrites):
+  app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URI
+  app.config.update(config_overwrites)
+  db.init_app(app)
 
 VALID_LOGIN_ATTEMPT_DELTA = timedelta(minutes=5)
 TOKEN_VALID_DELTA = timedelta(days=10)
@@ -17,11 +27,9 @@ class PendingLoginRequest(db.Model):
   timestamp = db.Column(db.DateTime, nullable=False)
 
 class AccessToken(db.Model):
-  email = db.Column(db.String(120), db.ForeignKey(User.email), primary_key=True)
+  email = db.Column(db.String(120), db.ForeignKey(User.email))
   token = db.Column(db.String(util.ACCESS_TOKEN_LENGTH), primary_key=True)
   timestamp = db.Column(db.DateTime, nullable=False)
-
-
 
 # Login
 
@@ -51,10 +59,3 @@ def close_login_request(email, secret_key):
   db.session.add(AccessToken(email=email, token=token, timestamp=util.now()))
   db.session.commit()
   return token
-
-
-def put(*items):
-  for i in items:
-    db.session.add(i)
-  db.session.commit()
-

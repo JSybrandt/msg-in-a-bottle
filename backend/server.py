@@ -3,55 +3,15 @@ from flask_cors import CORS
 from flask_mail import Mail, Message
 from flask_sqlalchemy import SQLAlchemy
 from pathlib import Path
-import os
 
+import database
+import mail
+import routes
 
-# CONFIGURE APP
 APP_NAME = "msg-in-a-bottle"
 API_NAME=f"{APP_NAME}-api"
-app = Flask(APP_NAME)
-cors = CORS(app)
 
-## DATABASE
-DATABASE_PATH=Path(f"{APP_NAME}.sqlite.db")
-DATABASE_URI=f"sqlite:///{DATABASE_PATH}"
-app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URI
-db = SQLAlchemy(app)
-
-## MAIL
-MAIL_SENDER="msg.in.a.bottle.mgmt@gmail.com"
-MAIL_CRED_PATH = Path(f"/etc/creds/{APP_NAME}-mail-pass")
-
-app.config["MAIL_PORT"] = 587
-app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USE_SSL'] = False
-app.config["MAIL_DEFAULT_SENDER"] = ("Message In A Bottle", MAIL_SENDER)
-
-def _configure_mailtrap():
-  print("Configuring test mail to send to mailtrap")
-  assert "MAILTRAP_USERNAME" in os.environ
-  assert "MAILTRAP_PASSWORD" in os.environ
-  app.config["MAIL_SERVER"] = "smtp.mailtrap.io"
-  app.config["MAIL_USERNAME"] = os.environ["MAILTRAP_USERNAME"]
-  app.config["MAIL_PASSWORD"] = os.environ["MAILTRAP_PASSWORD"]
-
-def _configure_gmail():
-  print("Configuring mail to send with gmail")
-  assert MAIL_CRED_PATH.is_file(), f"Set MAIL_CRED_PATH at {MAIL_CRED_PATH}"
-  app.config["MAIL_SERVER"] = "smtp.gmail.com"
-  app.config["MAIL_USERNAME"] = MAIL_SENDER
-  with open(MAIL_CRED_PATH) as cred_file:
-    app.config["MAIL_PASSWORD"] = cred_file.read().strip()
-
-if "MAILTRAP_USERNAME" in os.environ:
-  _configure_mailtrap()
-else:
-  _configure_gmail()
-mail = Mail(app)
-
-################################################################################
-
-def _get_args():
+def _get_run_args():
   fullchain_path=Path(
     f"/etc/letsencrypt/live/{API_NAME}.sybrandt.com/fullchain.pem")
   privkey_path=Path(
@@ -64,11 +24,19 @@ def _get_args():
   print("WARNING: Failed to get ssl cert. This only makes.")
   return {}
 
-def send_mail(subject, body, recipients):
-  msg = Message(subject, recipients=recipients)
-  msg.body=body
-  mail.send(msg)
 
-def run():
-  db.create_all()
-  app.run(threaded=True, **_get_args())
+def create_app(**config_overwrites):
+  # Create app with default configs
+  app = Flask(APP_NAME)
+  database.init_app(app, config_overwrites)
+  mail.init_app(app, config_overwrites)
+  cors = CORS(app)
+  app.register_blueprint(routes.blueprint)
+  app.app_context().push() # this does the binding
+  return app
+
+
+def run_app(app=None):
+  if app is None:
+    app = create_app()
+  app.run(threaded=True, **_get_run_args())
