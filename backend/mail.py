@@ -10,7 +10,6 @@ MAIL_CRED_PATH = Path(f"/etc/creds/msg-in-a-bottle-mail-pass")
 
 
 def _configure_mailtrap(app):
-  print("Configuring test mail to send to mailtrap")
   assert "MAILTRAP_USERNAME" in os.environ
   assert "MAILTRAP_PASSWORD" in os.environ
   app.config["MAIL_SERVER"] = "smtp.mailtrap.io"
@@ -19,7 +18,6 @@ def _configure_mailtrap(app):
 
 
 def _configure_gmail(app):
-  print("Configuring mail to send with gmail")
   assert MAIL_CRED_PATH.is_file(), f"Set MAIL_CRED_PATH at {MAIL_CRED_PATH}"
   app.config["MAIL_SERVER"] = "smtp.gmail.com"
   app.config["MAIL_USERNAME"] = MAIL_SENDER

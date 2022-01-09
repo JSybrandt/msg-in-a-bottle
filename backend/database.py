@@ -11,6 +11,7 @@ DATABASE_URI = f"sqlite:///msg-in-a-bottle.sqlite.db"
 
 def init_app(app, config_overwrites):
   app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URI
+  app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
   app.config.update(config_overwrites)
   db.init_app(app)
 
@@ -41,7 +42,6 @@ class AccessToken(db.Model):
 
 def open_login_request(email):
   """Returns a secret key that the user can use to login."""
-  print("prepare_login_attempt")
   secret_key = util.generate_secret_key()
   existing_query = db.session.query(PendingLoginRequest).filter(
       PendingLoginRequest.email == email)
