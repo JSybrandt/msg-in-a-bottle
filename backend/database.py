@@ -31,12 +31,11 @@ def init_app(app, config_overwrites):
 
 
 VALID_LOGIN_ATTEMPT_DELTA = timedelta(minutes=5)
-TOKEN_VALID_DELTA = timedelta(days=10)
+VALID_TOKEN_DELTA = timedelta(days=10)
 
 
 class User(db.Model):
   email = db.Column(db.String(120), primary_key=True)
-  name = db.Column(db.String(120), nullable=False)
 
 
 class PendingLoginRequest(db.Model):
@@ -49,6 +48,7 @@ class AccessToken(db.Model):
   email = db.Column(db.String(120), db.ForeignKey(User.email))
   token = db.Column(db.String(util.ACCESS_TOKEN_LENGTH), primary_key=True)
   timestamp = db.Column(db.DateTime, nullable=False)
+  user = db.relationship(User, lazy=True)
 
 
 # Helps us define a many-to-many relationship between messages and fragments.
@@ -101,15 +101,27 @@ def close_login_request(email, secret_key):
       PendingLoginRequest.timestamp > util.now() - VALID_LOGIN_ATTEMPT_DELTA)
   if attempt_query.count() != 1:
     raise ValueError("Invalid secret key")
-  attempt_query.delete()
+  if query(User).filter(User.email == email).count() == 0:
+    add(User(email=email))
   token = util.generate_access_token()
   add(AccessToken(email=email, token=token, timestamp=util.now()))
+  attempt_query.delete()
   commit()
   return token
 
 
-def new_message(text):
+def validate_token(token):
+  """Raises an exception if the api token is invalid."""
+  if query(AccessToken).filter(
+      AccessToken.token == token,
+      AccessToken.timestamp > util.now() - VALID_TOKEN_DELTA).count() != 1:
+    raise ValueError(f"Invalid API token: {token}")
+  return True
+
+
+def new_message(token, text):
   """Returns a message id associated with the new message."""
+  validate_token(token)
   message_id = util.new_id()
   add(
       Message(
@@ -119,8 +131,9 @@ def new_message(text):
   return message_id
 
 
-def append_fragment(old_message_id, text):
+def append_fragment(token, old_message_id, text):
   """Returns a message id for a new message that has the fragment appended."""
+  validate_token(token)
   new_message_id = util.new_id()
   old_message = query(Message).filter(Message.id == old_message_id).first()
   if old_message is None:
@@ -132,7 +145,8 @@ def append_fragment(old_message_id, text):
   return new_message_id
 
 
-def get_message(message_id):
+def get_message(token, message_id):
+  validate_token(token)
   msg = query(Message).filter(Message.id == message_id).first()
   if msg is None:
     raise ValueError(f"No message with id: {message_id}")

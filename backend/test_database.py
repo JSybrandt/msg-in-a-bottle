@@ -66,6 +66,14 @@ class DatabaseTest(server_test_util.ServerTestCase):
     self.assertGreater(access_token.timestamp, pre_close_time)
     self.assertLess(access_token.timestamp, post_close_time)
 
+  def test_new_user_after_first_login(self):
+    email = "test@gmail.com"
+    secret_key = database.open_login_request(email=email)
+    token = database.close_login_request(email=email, secret_key=secret_key)
+    user = database.query(
+        database.User).filter(database.User.email == email).first()
+    self.assertTrue(user is not None)
+
   def test_close_without_open(self):
     """Closing a login request without opening one first is an error."""
     with self.assertRaises(ValueError):
@@ -83,10 +91,14 @@ class DatabaseTest(server_test_util.ServerTestCase):
     self.assertEqual(
         database.query(database.PendingLoginRequest).filter(
             database.PendingLoginRequest.email == email).count(), 1)
+    # New user NOT created.
+    user = database.query(
+        database.User).filter(database.User.email == email).first()
+    self.assertTrue(user is None)
 
   def test_close_timeout(self):
     """Its an error if it takes too long to close the login attempt."""
-    long_ago = util.now() - 2 * database.TOKEN_VALID_DELTA
+    long_ago = util.now() - 2 * database.VALID_LOGIN_ATTEMPT_DELTA
     email = "test@gmail.com"
     secret_key = "abc123"
     database.add(
@@ -97,18 +109,24 @@ class DatabaseTest(server_test_util.ServerTestCase):
       database.close_login_request(email=email, secret_key=secret_key)
 
   def test_new_message(self):
+    token = self.create_test_user("test@gmail.com")
     expected_text = "test message here"
-    message_id = database.new_message(expected_text)
+    message_id = database.new_message(token, expected_text)
     message = database.query(
         database.Message).filter(database.Message.id == message_id).first()
     self.assertTrue(message is not None)
     self.assertEqual(len(message.fragments), 1)
     self.assertEqual(message.fragments[0].text, expected_text)
 
+  def test_new_messsage_bad_token(self):
+    with self.assertRaises(ValueError):
+      database.new_message(token=1234, text="new message text")
+
   def test_append_fragment(self):
-    msg_id_1 = database.new_message("first")
-    msg_id_2 = database.append_fragment(msg_id_1, "second")
-    msg_id_3 = database.append_fragment(msg_id_2, "third")
+    token = self.create_test_user("test@gmail.com")
+    msg_id_1 = database.new_message(token, "first")
+    msg_id_2 = database.append_fragment(token, msg_id_1, "second")
+    msg_id_3 = database.append_fragment(token, msg_id_2, "third")
 
     msg_1 = database.query(
         database.Message).filter(database.Message.id == msg_id_1).first()
@@ -127,11 +145,20 @@ class DatabaseTest(server_test_util.ServerTestCase):
                      ["first", "second", "third"])
 
   def test_append_fragment_missing_old_msg(self):
+    token = self.create_test_user("test@gmail.com")
     with self.assertRaises(ValueError):
-      database.append_fragment(12345, "bad_msg_id")
+      database.append_fragment(token, old_message_id=12345, text="bad_msg_id")
     self.assertEqual(database.query(database.Message).count(), 0)
 
+  def test_append_fragment_bad_token(self):
+    token = self.create_test_user("test@gmail.com")
+    message_id = database.new_message(token, "test message text")
+    with self.assertRaises(ValueError):
+      database.append_fragment(
+          token=1234, old_message_id=message_id, text="new message text")
+
   def test_get_message(self):
+    token = self.create_test_user("test@gmail.com")
     msg_id = 12345
     database.add(
         database.Message(
@@ -140,14 +167,38 @@ class DatabaseTest(server_test_util.ServerTestCase):
                 database.MessageFragment(id=util.new_id(), text="first"),
                 database.MessageFragment(id=util.new_id(), text="second")
             ]))
-    self.assertEqual(database.get_message(msg_id), ["first", "second"])
+    self.assertEqual(database.get_message(token, msg_id), ["first", "second"])
 
   def test_get_message_no_fragments(self):
+    token = self.create_test_user("test@gmail.com")
     msg_id = 12345
     database.add(database.Message(id=msg_id))
-    self.assertEqual(database.get_message(msg_id), [])
+    self.assertEqual(database.get_message(token, msg_id), [])
 
   def test_get_message_bad_id(self):
+    token = self.create_test_user("test@gmail.com")
     with self.assertRaises(ValueError):
-      database.get_message(9876)
+      database.get_message(token, message_id=9876)
 
+  def test_get_message_bad_token(self):
+    token = self.create_test_user("test@gmail.com")
+    message_id = database.new_message(token, "test message text")
+    with self.assertRaises(ValueError):
+      database.get_message(token=1234, message_id=message_id)
+
+  def test_validate_token_good(self):
+    token = self.create_test_user("test@gmail.com")
+    self.assertTrue(database.validate_token(token))
+
+  def test_validate_token_bad_value(self):
+    with self.assertRaises(ValueError):
+      database.validate_token("garbage token")
+
+  def test_validate_token_old_value(self):
+    token = util.generate_access_token()
+    long_ago = util.now() - 2 * database.VALID_TOKEN_DELTA
+    database.add(
+        database.AccessToken(
+            email="test@gmail.com", token=token, timestamp=long_ago))
+    with self.assertRaises(ValueError):
+      database.validate_token(token)
