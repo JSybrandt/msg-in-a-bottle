@@ -9,6 +9,7 @@ flask-cors = "*"
 flask-mail = "*"
 flask-sqlalchemy = "*"
 flask-testing = "*"
+yapf = "*"
 
 [dev-packages]
 

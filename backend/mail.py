@@ -5,8 +5,9 @@ import os
 # The user of this module will need to init this.
 mail = Mail()
 
-MAIL_SENDER="msg.in.a.bottle.mgmt@gmail.com"
+MAIL_SENDER = "msg.in.a.bottle.mgmt@gmail.com"
 MAIL_CRED_PATH = Path(f"/etc/creds/msg-in-a-bottle-mail-pass")
+
 
 def _configure_mailtrap(app):
   print("Configuring test mail to send to mailtrap")
@@ -16,6 +17,7 @@ def _configure_mailtrap(app):
   app.config["MAIL_USERNAME"] = os.environ["MAILTRAP_USERNAME"]
   app.config["MAIL_PASSWORD"] = os.environ["MAILTRAP_PASSWORD"]
 
+
 def _configure_gmail(app):
   print("Configuring mail to send with gmail")
   assert MAIL_CRED_PATH.is_file(), f"Set MAIL_CRED_PATH at {MAIL_CRED_PATH}"
@@ -23,6 +25,7 @@ def _configure_gmail(app):
   app.config["MAIL_USERNAME"] = MAIL_SENDER
   with open(MAIL_CRED_PATH) as cred_file:
     app.config["MAIL_PASSWORD"] = cred_file.read().strip()
+
 
 def init_app(app, config_overwrites):
   app.config["MAIL_PORT"] = 587
@@ -36,7 +39,8 @@ def init_app(app, config_overwrites):
   app.config.update(config_overwrites)
   mail.init_app(app)
 
+
 def send_mail(subject, body, recipients):
   msg = Message(subject, recipients=recipients)
-  msg.body=body
+  msg.body = body
   mail.send(msg)
