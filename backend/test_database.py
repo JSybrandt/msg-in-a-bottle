@@ -158,21 +158,18 @@ class DatabaseTest(server_test_util.ServerTestCase):
           token=1234, old_message_id=message_id, text="new message text")
 
   def test_get_message(self):
-    token = self.create_test_user("test@gmail.com")
-    msg_id = 12345
-    database.add(
-        database.Message(
-            id=msg_id,
-            fragments=[
-                database.MessageFragment(id=util.new_id(), text="first"),
-                database.MessageFragment(id=util.new_id(), text="second")
-            ]))
-    self.assertEqual(database.get_message(token, msg_id), ["first", "second"])
+    email = "test@gmail.com"
+    token = self.create_test_user(email)
+    message_id = database.new_message(token, "first")
+    self.assertEqual(database.get_message(token, message_id), ["first"])
 
   def test_get_message_no_fragments(self):
-    token = self.create_test_user("test@gmail.com")
+    email = "test@gmail.com"
+    token = self.create_test_user(email)
     msg_id = 12345
     database.add(database.Message(id=msg_id))
+    database.execute(database.reader_to_message_table.insert().values(
+        user_email=email, message_id=msg_id))
     self.assertEqual(database.get_message(token, msg_id), [])
 
   def test_get_message_bad_id(self):
@@ -187,8 +184,9 @@ class DatabaseTest(server_test_util.ServerTestCase):
       database.get_message(token=1234, message_id=message_id)
 
   def test_validate_token_good(self):
-    token = self.create_test_user("test@gmail.com")
-    self.assertTrue(database.validate_token(token))
+    email = "test@gmail.com"
+    token = self.create_test_user(email)
+    self.assertTrue(database.validate_token(token).email, email)
 
   def test_validate_token_bad_value(self):
     with self.assertRaises(ValueError):
