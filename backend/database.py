@@ -6,6 +6,20 @@ from flask_sqlalchemy import SQLAlchemy
 # The user of this module will need to init this.
 db = SQLAlchemy()
 
+
+# A little syntactic sugar to make queries easier.
+def query(*args, **kwargs):
+  return db.session.query(*args, **kwargs)
+
+
+def add(*args, **kwargs):
+  return db.session.add(*args, **kwargs)
+
+
+def commit(*args, **kwargs):
+  return db.session.commit(*args, **kwargs)
+
+
 DATABASE_URI = f"sqlite:///msg-in-a-bottle.sqlite.db"
 
 
@@ -36,17 +50,29 @@ class AccessToken(db.Model):
   token = db.Column(db.String(util.ACCESS_TOKEN_LENGTH), primary_key=True)
   timestamp = db.Column(db.DateTime, nullable=False)
 
+
+# Helps us define a many-to-many relationship between messages and fragments.
+message_to_fragment_table = db.Table(
+    "message_to_fragment",
+    db.Column(
+        "message_id", db.Integer, db.ForeignKey("message.id"),
+        primary_key=True),
+    db.Column(
+        "fragment_id",
+        db.Integer,
+        db.ForeignKey("message_fragment.id"),
+        primary_key=True))
+
+
 class MessageFragment(db.Model):
   id = db.Column(db.Integer, primary_key=True)
   text = db.Column(db.String(200), nullable=False)
 
+
 class Message(db.Model):
   id = db.Column(db.Integer, primary_key=True)
-
-class MessageAndFragment(db.Model):
-  message_id = db.Column(db.Integer, primary_key=True, foreign_key=Message.id)
-  fragment_id = db.Column(db.Integer, primary_key=True, foreign_key=MessageFragment.id)
-  fragment = db.relationship("MessageFragment")
+  fragments = db.relationship(
+      MessageFragment, secondary=message_to_fragment_table, lazy=True)
 
 
 # Login
@@ -55,7 +81,7 @@ class MessageAndFragment(db.Model):
 def open_login_request(email):
   """Returns a secret key that the user can use to login."""
   secret_key = util.generate_secret_key()
-  existing_query = db.session.query(PendingLoginRequest).filter(
+  existing_query = query(PendingLoginRequest).filter(
       PendingLoginRequest.email == email)
   if existing_query.first() is None:
     db.session.add(
@@ -63,13 +89,13 @@ def open_login_request(email):
             email=email, secret_key=secret_key, timestamp=util.now()))
   else:
     existing_query.update(dict(secret_key=secret_key, timestamp=util.now()))
-  db.session.commit()
+  commit()
   return secret_key
 
 
 def close_login_request(email, secret_key):
   """Returns a token if the secret key is valid for the email."""
-  attempt_query = db.session.query(PendingLoginRequest).filter(
+  attempt_query = query(PendingLoginRequest).filter(
       PendingLoginRequest.email == email,
       PendingLoginRequest.secret_key == secret_key.upper(),
       PendingLoginRequest.timestamp > util.now() - VALID_LOGIN_ATTEMPT_DELTA)
@@ -77,34 +103,37 @@ def close_login_request(email, secret_key):
     raise ValueError("Invalid secret key")
   attempt_query.delete()
   token = util.generate_access_token()
-  db.session.add(AccessToken(email=email, token=token, timestamp=util.now()))
-  db.session.commit()
+  add(AccessToken(email=email, token=token, timestamp=util.now()))
+  commit()
   return token
 
+
 def new_message(text):
+  """Returns a message id associated with the new message."""
   message_id = util.new_id()
-  fragment_id = util.new_id()
-  db.session.add(Message(id=message_id))
-  db.session.add(MessageFragment(id=fragment_id))
-  db.session.add(MessageAndFragment(message_id=message_id, fragment_id=fragment_id))
-  db.session.commit()
+  add(
+      Message(
+          id=message_id,
+          fragments=[MessageFragment(id=util.new_id(), text=text)]))
+  commit()
   return message_id
 
-def append_message(old_message_id, text):
+
+def append_fragment(old_message_id, text):
+  """Returns a message id for a new message that has the fragment appended."""
   new_message_id = util.new_id()
-  new_fragment_id = util.new_id()
-  fragment_ids = db.session.query(MessageAndFragment).filter(MessageAndFragment.message_id == old_message_id).all()
-  fragment_ids.append(new_fragment_id)
-  db.session.add(Message(id=new_message_id))
-  db.session.add(MessageFragment(id=new_fragment_id))
-  for frag_id in fragment_ids:
-    db.session.add(MessageAndFragment(message_id=new_message_id, fragment_id=frag_id))
-  db.session.commit()
+  old_message = query(Message).filter(Message.id == old_message_id).first()
+  if old_message is None:
+    raise ValueError(f"No message with id: {old_message_id}")
+  new_fragments = old_message.fragments.copy()
+  new_fragments.append(MessageFragment(id=util.new_id(), text=text))
+  add(Message(id=new_message_id, fragments=new_fragments))
+  commit()
   return new_message_id
 
+
 def get_message(message_id):
-  fragments = db.session.query(MessageAndFragment.fragment).filter(MessageAndFragment.message_id == message_id).all()
-  return [f.text for f in fragments]
-
-
-
+  msg = query(Message).filter(Message.id == message_id).first()
+  if msg is None:
+    raise ValueError(f"No message with id: {message_id}")
+  return [f.text for f in msg.fragments]
