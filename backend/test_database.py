@@ -200,3 +200,21 @@ class DatabaseTest(server_test_util.ServerTestCase):
             email="test@gmail.com", token=token, timestamp=long_ago))
     with self.assertRaises(ValueError):
       database.validate_token(token)
+
+  def test_set_writer(self):
+    token = self.create_test_user("author@gmail.com")
+    message_id = database.new_message(token, "test message")
+    writer_email = "writer@gmail.com"
+    self.create_test_user(writer_email)
+    database.set_message_writer(message_id, writer_email)
+
+    messages = database.query(database.Message).filter(
+        database.Message.writer_email == writer_email).all()
+    self.assertEqual(len(messages), 1)
+    self.assertEqual(messages[0].id, message_id)
+
+    user = database.query(
+        database.User).filter(database.User.email == writer_email).first()
+    self.assertTrue(user is not None)
+    self.assertEqual(len(user.writeable_messages), 1)
+    self.assertEqual(user.writeable_messages[0].id, message_id)

@@ -190,3 +190,18 @@ def get_message(token, message_id):
     raise ValueError(f"User {user.email} doesn't have permission to view "
                      f"message: {message_id}")
   return [f.text for f in msg.fragments]
+
+
+def set_message_writer(message_id, email):
+  """Updated message to have the specified owner.
+
+  Not intended for users to trigger.
+  """
+  msg = query(Message).filter(Message.id == message_id).first()
+  if msg is None:
+    raise ValueError(f"No message with id: {message_id}")
+  user = query(User).filter(User.email == email).first()
+  if user is None:
+    raise ValueError(f"No user with email: {email}")
+  msg.writer = user
+  commit()
