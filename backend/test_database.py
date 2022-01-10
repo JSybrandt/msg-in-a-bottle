@@ -218,3 +218,38 @@ class DatabaseTest(server_test_util.ServerTestCase):
     self.assertTrue(user is not None)
     self.assertEqual(len(user.writeable_messages), 1)
     self.assertEqual(user.writeable_messages[0].id, message_id)
+
+  def test_set_writer_overwrite(self):
+    message_id = database.new_message(
+        self.create_test_user("author@gmail.com"), "test message")
+
+    email_1 = "writer_1@gmail.com"
+    self.create_test_user(email_1)
+    database.set_message_writer(message_id, email_1)
+
+    email_2 = "writer_2@gmail.com"
+    self.create_test_user(email_2)
+    database.set_message_writer(message_id, email_2)
+
+    user_1 = database.query(
+        database.User).filter(database.User.email == email_1).first()
+    user_2 = database.query(
+        database.User).filter(database.User.email == email_2).first()
+    message = database.query(
+        database.Message).filter(database.Message.id == message_id).first()
+
+    self.assertEqual(message.writer_email, email_2)
+    self.assertEqual(message.writer, user_2)
+    self.assertEqual(len(user_1.writeable_messages), 0)
+    self.assertEqual(len(user_2.writeable_messages), 1)
+
+  def test_set_writer_bad_email(self):
+    message_id = database.new_message(
+        self.create_test_user("author@gmail.com"), "test message")
+    with self.assertRaises(ValueError):
+      database.set_message_writer(message_id, "garbage@gmail.com")
+
+  def test_set_writer_message_id(self):
+    self.create_test_user("author@gmail.com")
+    with self.assertRaises(ValueError):
+      database.set_message_writer(message_id=123456, email="author@gmail.com")
