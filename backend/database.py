@@ -2,6 +2,7 @@ from sqlalchemy.sql import func
 import util
 from datetime import datetime, timedelta
 from flask_sqlalchemy import SQLAlchemy
+import random
 
 # The user of this module will need to init this.
 db = SQLAlchemy()
@@ -69,19 +70,23 @@ class User(db.Model):
   readable_messages = db.relationship(
       "Message", secondary=reader_to_message_table, lazy=True)
   # writeable_messages: provided by Message.writer_email backref.
+  coordinate_x = db.Column(db.Float, nullable=False, default=random.random)
+  coordinate_y = db.Column(db.Float, nullable=False, default=random.random)
+  creation_timestamp = db.Column(db.DateTime, nullable=False, default=util.now)
 
 
 class PendingLoginRequest(db.Model):
   email = db.Column(
       db.String(EMAIL_MAX_LENGTH), db.ForeignKey(User.email), primary_key=True)
   secret_key = db.Column(db.String(util.SECRET_KEY_LENGTH), nullable=False)
-  timestamp = db.Column(db.DateTime, nullable=False)
+  timestamp = db.Column(
+      db.DateTime, nullable=False, default=util.now, onupdate=util.now)
 
 
 class AccessToken(db.Model):
   email = db.Column(db.String(EMAIL_MAX_LENGTH), db.ForeignKey(User.email))
   token = db.Column(db.String(util.ACCESS_TOKEN_LENGTH), primary_key=True)
-  timestamp = db.Column(db.DateTime, nullable=False)
+  timestamp = db.Column(db.DateTime, nullable=False, default=util.now)
   user = db.relationship(User, lazy=True)
 
 
@@ -91,6 +96,7 @@ class MessageFragment(db.Model):
   author_email = db.Column(
       db.String(EMAIL_MAX_LENGTH), db.ForeignKey(User.email), nullable=False)
   author = db.relationship(User, lazy=True)
+  timestamp = db.Column(db.DateTime, nullable=False, default=util.now)
 
 
 class Message(db.Model):
@@ -103,9 +109,7 @@ class Message(db.Model):
   writer = db.relationship(
       User, lazy=True, backref=db.backref("writeable_messages", lazy=True))
   readers = db.relationship(User, secondary=reader_to_message_table, lazy=True)
-
-
-# Login
+  timestamp = db.Column(db.DateTime, nullable=False, default=util.now)
 
 
 def open_login_request(email):
@@ -114,11 +118,9 @@ def open_login_request(email):
   existing_query = query(PendingLoginRequest).filter(
       PendingLoginRequest.email == email)
   if existing_query.first() is None:
-    db.session.add(
-        PendingLoginRequest(
-            email=email, secret_key=secret_key, timestamp=util.now()))
+    db.session.add(PendingLoginRequest(email=email, secret_key=secret_key))
   else:
-    existing_query.update(dict(secret_key=secret_key, timestamp=util.now()))
+    existing_query.update(dict(secret_key=secret_key))
   commit()
   return secret_key
 
@@ -134,7 +136,7 @@ def close_login_request(email, secret_key):
   if query(User).filter(User.email == email).count() == 0:
     add(User(email=email))
   token = util.generate_access_token()
-  add(AccessToken(email=email, token=token, timestamp=util.now()))
+  add(AccessToken(email=email, token=token))
   attempt_query.delete()
   commit()
   return token
@@ -205,3 +207,23 @@ def set_message_writer(message_id, email):
     raise ValueError(f"No user with email: {email}")
   msg.writer = user
   commit()
+
+
+def get_coordinates(email):
+  """Returns the (X, Y) coordinates of a user."""
+  user = query(User).filter(User.email == email).first()
+  if user is None:
+    raise ValueError(f"No user with email: {email}")
+  return (user.coordinate_x, user.coordinate_y)
+
+
+def select_close_random_neighbor(email):
+  """Returns an email of a user who is located close to the recipient."""
+  x, y = get_coordinates(email)
+  near_users = query(User.email).filter(User.email != email).order_by(
+      func.sqrt(
+          func.pow(User.coordinate_x - x, 2) +
+          func.pow(User.coordinate_y - y, 2))).limit(10).all()
+  if not near_users:
+    raise ValueError("No near neighbors identified.")
+  return random.choice(near_users)[0]

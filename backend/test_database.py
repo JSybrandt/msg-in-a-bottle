@@ -28,10 +28,7 @@ class DatabaseTest(server_test_util.ServerTestCase):
   def test_open_login_twice(self):
     """If the same user attempts to login twice, the old request should be ignored."""
     email = "test@gmail.com"
-
-    pre_request_time_1 = util.now()
-    secret_key_1 = database.open_login_request(email=email)
-    post_request_time_1 = util.now()
+    database.open_login_request(email=email)
 
     pre_request_time_2 = util.now()
     secret_key_2 = database.open_login_request(email=email)
@@ -253,3 +250,30 @@ class DatabaseTest(server_test_util.ServerTestCase):
     self.create_test_user("author@gmail.com")
     with self.assertRaises(ValueError):
       database.set_message_writer(message_id=123456, email="author@gmail.com")
+
+  def test_select_close_neighbor_one_cadidate(self):
+    email_a = "a@gmail.com"
+    email_b = "b@gmail.com"
+    self.create_test_user(email_a)
+    self.create_test_user(email_b)
+    self.assertEqual(database.select_close_random_neighbor(email_a), email_b)
+
+  def test_select_close_neighbor_bad_email(self):
+    with self.assertRaises(ValueError):
+      database.select_close_random_neighbor("garbage@gmail.com")
+
+  def test_select_close_neighbor_one_user(self):
+    email = "test@gmail.com"
+    self.create_test_user(email)
+    with self.assertRaises(ValueError):
+      database.select_close_random_neighbor(email)
+
+  def test_select_close_neighbor_ten_nearest_candidates(self):
+    for i in range(20):
+      database.add(
+          database.User(email=str(i), coordinate_y=0, coordinate_x=i / 11))
+    seen_neighbors = set()
+    for _ in range(1000):
+      seen_neighbors.add(database.select_close_random_neighbor("0"))
+    self.assertEqual(seen_neighbors,
+                     {"1", "2", "3", "4", "5", "6", "7", "8", "9", "10"})
