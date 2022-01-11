@@ -52,24 +52,9 @@ message_to_fragment_table = db.Table(
         db.ForeignKey("message_fragment.id"),
         primary_key=True))
 
-# Defines a many-to-many relationship between readers and .messages.
-reader_to_message_table = db.Table(
-    "reader_to_message",
-    db.Column(
-        "user_email",
-        db.String(EMAIL_MAX_LENGTH),
-        db.ForeignKey("user.email"),
-        primary_key=True),
-    db.Column(
-        "message_id", db.Integer, db.ForeignKey("message.id"),
-        primary_key=True))
-
 
 class User(db.Model):
   email = db.Column(db.String(EMAIL_MAX_LENGTH), primary_key=True)
-  readable_messages = db.relationship(
-      "Message", secondary=reader_to_message_table, lazy=True)
-  # writeable_messages: provided by Message.writer_email backref.
   coordinate_x = db.Column(db.Float, nullable=False, default=random.random)
   coordinate_y = db.Column(db.Float, nullable=False, default=random.random)
   creation_timestamp = db.Column(db.DateTime, nullable=False, default=util.now)
@@ -103,12 +88,20 @@ class Message(db.Model):
   id = db.Column(db.Integer, primary_key=True)
   fragments = db.relationship(
       MessageFragment, secondary=message_to_fragment_table, lazy=True)
-  # The person who's allowed to append to this message.
-  writer_email = db.Column(
+  owner_email = db.Column(
       db.String(EMAIL_MAX_LENGTH), db.ForeignKey(User.email), nullable=True)
-  writer = db.relationship(
-      User, lazy=True, backref=db.backref("writeable_messages", lazy=True))
-  readers = db.relationship(User, secondary=reader_to_message_table, lazy=True)
+  author_email = db.Column(
+      db.String(EMAIL_MAX_LENGTH), db.ForeignKey(User.email), nullable=True)
+  owner = db.relationship(
+      User,
+      foreign_keys=owner_email,
+      lazy=True,
+      backref=db.backref("owned_messages", lazy=True))
+  author = db.relationship(
+      User,
+      foreign_keys=author_email,
+      lazy=True,
+      backref=db.backref("authored_messages", lazy=True))
   timestamp = db.Column(db.DateTime, nullable=False, default=util.now)
 
 
@@ -159,11 +152,8 @@ def new_message(token, text):
   add(
       Message(
           id=message_id,
-          fragments=[
-              MessageFragment(
-                  id=util.new_id(), text=text, author_email=user.email)
-          ],
-          readers=[user]))
+          fragments=[MessageFragment(id=util.new_id(), text=text, author=user)],
+          author=user))
   commit()
   return message_id
 
@@ -177,8 +167,8 @@ def append_fragment(token, old_message_id, text):
     raise ValueError(f"No message with id: {old_message_id}")
   new_fragments = old_message.fragments.copy()
   new_fragments.append(
-      MessageFragment(id=util.new_id(), text=text, author_email=user.email))
-  add(Message(id=new_message_id, fragments=new_fragments, readers=[user]))
+      MessageFragment(id=util.new_id(), text=text, author=user))
+  add(Message(id=new_message_id, fragments=new_fragments, author=user))
   commit()
   return new_message_id
 
@@ -188,13 +178,13 @@ def get_message(token, message_id):
   msg = query(Message).filter(Message.id == message_id).first()
   if msg is None:
     raise ValueError(f"No message with id: {message_id}")
-  if user.email not in set(r.email for r in msg.readers):
+  if user.email not in {msg.author_email, msg.owner_email}:
     raise ValueError(f"User {user.email} doesn't have permission to view "
                      f"message: {message_id}")
   return [f.text for f in msg.fragments]
 
 
-def set_message_writer(message_id, email):
+def set_message_owner(message_id, email):
   """Updated message to have the specified owner.
 
   Not intended for users to trigger.
@@ -205,7 +195,7 @@ def set_message_writer(message_id, email):
   user = query(User).filter(User.email == email).first()
   if user is None:
     raise ValueError(f"No user with email: {email}")
-  msg.writer = user
+  msg.owner = user
   commit()
 
 

@@ -164,9 +164,7 @@ class DatabaseTest(server_test_util.ServerTestCase):
     email = "test@gmail.com"
     token = self.create_test_user(email)
     msg_id = 12345
-    database.add(database.Message(id=msg_id))
-    database.execute(database.reader_to_message_table.insert().values(
-        user_email=email, message_id=msg_id))
+    database.add(database.Message(id=msg_id, author_email=email))
     self.assertEqual(database.get_message(token, msg_id), [])
 
   def test_get_message_bad_id(self):
@@ -198,35 +196,51 @@ class DatabaseTest(server_test_util.ServerTestCase):
     with self.assertRaises(ValueError):
       database.validate_token(token)
 
-  def test_set_writer(self):
+  def test_set_owner(self):
     token = self.create_test_user("author@gmail.com")
     message_id = database.new_message(token, "test message")
-    writer_email = "writer@gmail.com"
-    self.create_test_user(writer_email)
-    database.set_message_writer(message_id, writer_email)
+    owner_email = "owner@gmail.com"
+    self.create_test_user(owner_email)
+    database.set_message_owner(message_id, owner_email)
 
     messages = database.query(database.Message).filter(
-        database.Message.writer_email == writer_email).all()
+        database.Message.owner_email == owner_email).all()
     self.assertEqual(len(messages), 1)
     self.assertEqual(messages[0].id, message_id)
 
     user = database.query(
-        database.User).filter(database.User.email == writer_email).first()
+        database.User).filter(database.User.email == owner_email).first()
     self.assertTrue(user is not None)
-    self.assertEqual(len(user.writeable_messages), 1)
-    self.assertEqual(user.writeable_messages[0].id, message_id)
+    self.assertEqual(len(user.owned_messages), 1)
+    self.assertEqual(user.owned_messages[0].id, message_id)
 
-  def test_set_writer_overwrite(self):
+  def test_set_owner_gives_read_permission(self):
+    author_token = self.create_test_user("author@gmail.com")
+    owner_token = self.create_test_user("owner@gmail.com")
+    message_id = database.new_message(author_token, "test message")
+    # Author can read..
+    self.assertEqual(
+        database.get_message(author_token, message_id), ["test message"])
+    # Owner can't yet.
+    with self.assertRaises(ValueError):
+      database.get_message(owner_token, message_id)
+    # Grant owner permission.
+    database.set_message_owner(message_id, "owner@gmail.com")
+    # Now it works
+    self.assertEqual(
+        database.get_message(owner_token, message_id), ["test message"])
+
+  def test_set_owner_overwrite(self):
     message_id = database.new_message(
         self.create_test_user("author@gmail.com"), "test message")
 
-    email_1 = "writer_1@gmail.com"
+    email_1 = "owner_1@gmail.com"
     self.create_test_user(email_1)
-    database.set_message_writer(message_id, email_1)
+    database.set_message_owner(message_id, email_1)
 
-    email_2 = "writer_2@gmail.com"
+    email_2 = "owner_2@gmail.com"
     self.create_test_user(email_2)
-    database.set_message_writer(message_id, email_2)
+    database.set_message_owner(message_id, email_2)
 
     user_1 = database.query(
         database.User).filter(database.User.email == email_1).first()
@@ -235,21 +249,21 @@ class DatabaseTest(server_test_util.ServerTestCase):
     message = database.query(
         database.Message).filter(database.Message.id == message_id).first()
 
-    self.assertEqual(message.writer_email, email_2)
-    self.assertEqual(message.writer, user_2)
-    self.assertEqual(len(user_1.writeable_messages), 0)
-    self.assertEqual(len(user_2.writeable_messages), 1)
+    self.assertEqual(message.owner_email, email_2)
+    self.assertEqual(message.owner, user_2)
+    self.assertEqual(len(user_1.owned_messages), 0)
+    self.assertEqual(len(user_2.owned_messages), 1)
 
-  def test_set_writer_bad_email(self):
+  def test_set_owner_bad_email(self):
     message_id = database.new_message(
         self.create_test_user("author@gmail.com"), "test message")
     with self.assertRaises(ValueError):
-      database.set_message_writer(message_id, "garbage@gmail.com")
+      database.set_message_owner(message_id, "garbage@gmail.com")
 
-  def test_set_writer_message_id(self):
+  def test_set_owner_message_id(self):
     self.create_test_user("author@gmail.com")
     with self.assertRaises(ValueError):
-      database.set_message_writer(message_id=123456, email="author@gmail.com")
+      database.set_message_owner(message_id=123456, email="author@gmail.com")
 
   def test_find_close_user_one_cadidate(self):
     email_a = "a@gmail.com"
