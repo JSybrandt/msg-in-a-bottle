@@ -108,40 +108,30 @@ class DatabaseTest(server_test_util.ServerTestCase):
   def test_new_message(self):
     user, _ = self.create_test_user("test@gmail.com")
     expected_text = "test message here"
-    message_id = database.new_message(user, expected_text)
-    message = database.query(
-        database.Message).filter(database.Message.id == message_id).first()
+    database.new_message(user, expected_text)
+    message = database.query(database.Message).first()
     self.assertTrue(message is not None)
     self.assertEqual(len(message.fragments), 1)
     self.assertEqual(message.fragments[0].text, expected_text)
 
   def test_append_fragment(self):
     user, _ = self.create_test_user("test@gmail.com")
-    msg_id_1 = database.new_message(user, "first")
-    msg_id_2 = database.append_fragment(user, msg_id_1, "second")
-    msg_id_3 = database.append_fragment(user, msg_id_2, "third")
-
-    msg_1 = database.query(
-        database.Message).filter(database.Message.id == msg_id_1).first()
-    msg_2 = database.query(
-        database.Message).filter(database.Message.id == msg_id_2).first()
-    msg_3 = database.query(
-        database.Message).filter(database.Message.id == msg_id_3).first()
-
-    self.assertTrue(msg_1 is not None)
-    self.assertTrue(msg_2 is not None)
-    self.assertTrue(msg_3 is not None)
+    msg_1 = database.new_message(user, "first")
+    msg_1.owner = user
+    msg_2 = database.append_fragment(user, msg_1, "second")
+    msg_2.owner = user
+    msg_3 = database.append_fragment(user, msg_2, "third")
 
     self.assertEqual([f.text for f in msg_1.fragments], ["first"])
     self.assertEqual([f.text for f in msg_2.fragments], ["first", "second"])
     self.assertEqual([f.text for f in msg_3.fragments],
                      ["first", "second", "third"])
 
-  def test_append_fragment_missing_old_msg(self):
+  def test_append_fragment_bad_owner(self):
     user, _ = self.create_test_user("test@gmail.com")
+    msg = database.new_message(user, "test")
     with self.assertRaises(ValueError):
-      database.append_fragment(user, old_message_id=12345, text="bad_msg_id")
-    self.assertEqual(database.query(database.Message).count(), 0)
+      database.append_fragment(user, msg, text="user isn't owner")
 
   def test_get_user_from_token(self):
     user, token = self.create_test_user("test@gmail.com")

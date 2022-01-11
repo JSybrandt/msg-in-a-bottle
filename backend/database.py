@@ -83,7 +83,7 @@ class AccessToken(db.Model):
 
 
 class MessageFragment(db.Model):
-  id = db.Column(db.Integer, primary_key=True)
+  id = db.Column(db.Integer, primary_key=True, default=util.new_id)
   text = db.Column(db.String(500), nullable=False)
   author_email = db.Column(
       db.String(EMAIL_MAX_LENGTH), db.ForeignKey(User.email), nullable=False)
@@ -92,7 +92,7 @@ class MessageFragment(db.Model):
 
 
 class Message(db.Model):
-  id = db.Column(db.Integer, primary_key=True)
+  id = db.Column(db.Integer, primary_key=True, default=util.new_id)
   fragments = db.relationship(
       MessageFragment, secondary=message_to_fragment_table, lazy=True)
   owner_email = db.Column(
@@ -153,29 +153,25 @@ def get_user_from_token(token):
 
 
 def new_message(user, text):
-  """Returns a message id associated with the new message."""
-  message_id = util.new_id()
-  add(
-      Message(
-          id=message_id,
-          fragments=[MessageFragment(id=util.new_id(), text=text, author=user)],
-          author=user))
+  """Adds a new message to the database. Returns msg."""
+  msg = Message(
+      fragments=[MessageFragment(text=text, author=user)], author=user)
+  add(msg)
   commit()
-  return message_id
+  return msg
 
 
-def append_fragment(user, old_message_id, text):
-  """Returns a message id for a new message that has the fragment appended."""
-  new_message_id = util.new_id()
-  old_message = query(Message).filter(Message.id == old_message_id).first()
-  if old_message is None:
-    raise ValueError(f"No message with id: {old_message_id}")
+def append_fragment(user, old_message, text):
+  """Adds new message with a new fragment appended. Returns new msg."""
+  if old_message.owner != user:
+    raise ValueError(
+        f"User {user.email} is not the owner of message: {old_message.id}")
   new_fragments = old_message.fragments.copy()
-  new_fragments.append(
-      MessageFragment(id=util.new_id(), text=text, author=user))
-  add(Message(id=new_message_id, fragments=new_fragments, author=user))
+  new_fragments.append(MessageFragment(text=text, author=user))
+  msg = Message(fragments=new_fragments, author=user)
+  add(msg)
   commit()
-  return new_message_id
+  return msg
 
 
 def user_may_receive_msg(user):
