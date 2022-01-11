@@ -294,3 +294,23 @@ class DatabaseTest(server_test_util.ServerTestCase):
       seen_emails.add(random_user.email)
     self.assertEqual(seen_emails,
                      {"1", "2", "3", "4", "5", "6", "7", "8", "9", "10"})
+
+  def test_user_may_recieve_msg_new_user(self):
+    user = database.User(
+        email="new_user@gmail.com", last_msg_received_timestamp=None)
+    database.add(user)
+    self.assertTrue(database.user_may_receive_msg(user))
+
+  def test_user_may_recieve_msg_returning_user(self):
+    long_ago = util.now() - 2 * database.NEW_MESSAGE_MIN_DELTA
+    user = database.User(
+        email="old_user@gmail.com", last_msg_received_timestamp=long_ago)
+    database.add(user)
+    self.assertTrue(database.user_may_receive_msg(user))
+
+  def test_user_may_recieve_msg_recent_user(self):
+    long_ago = util.now() - 0.5 * database.NEW_MESSAGE_MIN_DELTA
+    user = database.User(
+        email="recent_user@gmail.com", last_msg_received_timestamp=long_ago)
+    database.add(user)
+    self.assertFalse(database.user_may_receive_msg(user))

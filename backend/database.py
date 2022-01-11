@@ -37,6 +37,7 @@ def init_app(app, config_overwrites):
 
 VALID_LOGIN_ATTEMPT_DELTA = timedelta(minutes=5)
 VALID_TOKEN_DELTA = timedelta(days=10)
+NEW_MESSAGE_MIN_DELTA = timedelta(days=1)
 
 EMAIL_MAX_LENGTH = 120
 
@@ -58,6 +59,8 @@ class User(db.Model):
   coordinate_x = db.Column(db.Float, nullable=False, default=random.random)
   coordinate_y = db.Column(db.Float, nullable=False, default=random.random)
   creation_timestamp = db.Column(db.DateTime, nullable=False, default=util.now)
+  last_msg_received_timestamp = db.Column(
+      db.DateTime, nullable=True, default=util.now)
 
 
 class PendingLoginRequest(db.Model):
@@ -91,7 +94,7 @@ class Message(db.Model):
   owner_email = db.Column(
       db.String(EMAIL_MAX_LENGTH), db.ForeignKey(User.email), nullable=True)
   author_email = db.Column(
-      db.String(EMAIL_MAX_LENGTH), db.ForeignKey(User.email), nullable=True)
+      db.String(EMAIL_MAX_LENGTH), db.ForeignKey(User.email), nullable=False)
   owner = db.relationship(
       User,
       foreign_keys=owner_email,
@@ -208,3 +211,10 @@ def find_close_random_user(user):
   if not near_users:
     raise ValueError("No near users identified.")
   return random.choice(near_users)
+
+
+def user_may_receive_msg(user):
+  """Returns true if the user hasn't received a msg recently."""
+  if user.last_msg_received_timestamp is None:
+    return True
+  return user.last_msg_received_timestamp < util.now() - NEW_MESSAGE_MIN_DELTA
