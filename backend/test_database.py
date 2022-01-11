@@ -251,29 +251,32 @@ class DatabaseTest(server_test_util.ServerTestCase):
     with self.assertRaises(ValueError):
       database.set_message_writer(message_id=123456, email="author@gmail.com")
 
-  def test_select_close_neighbor_one_cadidate(self):
+  def test_find_close_user_one_cadidate(self):
     email_a = "a@gmail.com"
     email_b = "b@gmail.com"
     self.create_test_user(email_a)
     self.create_test_user(email_b)
-    self.assertEqual(database.select_close_random_neighbor(email_a), email_b)
+    user_a = database.query(database.User).filter_by(email=email_a).one()
+    user_b = database.query(database.User).filter_by(email=email_b).one()
+    self.assertEqual(database.find_close_random_user(user_a), user_b)
 
-  def test_select_close_neighbor_bad_email(self):
-    with self.assertRaises(ValueError):
-      database.select_close_random_neighbor("garbage@gmail.com")
-
-  def test_select_close_neighbor_one_user(self):
+  def test_find_close_user_one_user(self):
     email = "test@gmail.com"
     self.create_test_user(email)
+    user = database.query(database.User).filter_by(email=email).one()
     with self.assertRaises(ValueError):
-      database.select_close_random_neighbor(email)
+      database.find_close_random_user(user)
 
-  def test_select_close_neighbor_ten_nearest_candidates(self):
-    for i in range(20):
-      database.add(
-          database.User(email=str(i), coordinate_y=0, coordinate_x=i / 11))
-    seen_neighbors = set()
+  def test_find_close_user_ten_nearest_candidates(self):
+    users = [
+        database.User(email=str(i), coordinate_y=0, coordinate_x=i / 11)
+        for i in range(20)
+    ]
+    for u in users:
+      database.add(u)
+    seen_emails = set()
     for _ in range(1000):
-      seen_neighbors.add(database.select_close_random_neighbor("0"))
-    self.assertEqual(seen_neighbors,
+      random_user = database.find_close_random_user(users[0])
+      seen_emails.add(random_user.email)
+    self.assertEqual(seen_emails,
                      {"1", "2", "3", "4", "5", "6", "7", "8", "9", "10"})

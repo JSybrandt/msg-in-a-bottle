@@ -209,21 +209,12 @@ def set_message_writer(message_id, email):
   commit()
 
 
-def get_coordinates(email):
-  """Returns the (X, Y) coordinates of a user."""
-  user = query(User).filter(User.email == email).first()
-  if user is None:
-    raise ValueError(f"No user with email: {email}")
-  return (user.coordinate_x, user.coordinate_y)
-
-
-def select_close_random_neighbor(email):
+def find_close_random_user(user):
   """Returns an email of a user who is located close to the recipient."""
-  x, y = get_coordinates(email)
-  near_users = query(User.email).filter(User.email != email).order_by(
+  near_users = query(User).filter(User.email != user.email).order_by(
       func.sqrt(
-          func.pow(User.coordinate_x - x, 2) +
-          func.pow(User.coordinate_y - y, 2))).limit(10).all()
+          func.pow(User.coordinate_x - user.coordinate_x, 2) +
+          func.pow(User.coordinate_y - user.coordinate_y, 2))).limit(10).all()
   if not near_users:
-    raise ValueError("No near neighbors identified.")
-  return random.choice(near_users)[0]
+    raise ValueError("No near users identified.")
+  return random.choice(near_users)
