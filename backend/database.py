@@ -25,6 +25,10 @@ def execute(*args, **kwargs):
   return db.session.execute(*args, **kwargs)
 
 
+def refresh(*args, **kwargs):
+  return db.session.refresh(*args, **kwargs)
+
+
 DATABASE_URI = f"sqlite:///msg-in-a-bottle.sqlite.db"
 
 
@@ -138,7 +142,7 @@ def close_login_request(email, secret_key):
   return token
 
 
-def validate_token(token):
+def get_user_from_token(token):
   """Raises an exception if the api token is invalid. Returns user."""
   access_token = query(AccessToken).filter(
       AccessToken.token == token,
@@ -148,9 +152,8 @@ def validate_token(token):
   return access_token.user
 
 
-def new_message(token, text):
+def new_message(user, text):
   """Returns a message id associated with the new message."""
-  user = validate_token(token)
   message_id = util.new_id()
   add(
       Message(
@@ -161,9 +164,8 @@ def new_message(token, text):
   return message_id
 
 
-def append_fragment(token, old_message_id, text):
+def append_fragment(user, old_message_id, text):
   """Returns a message id for a new message that has the fragment appended."""
-  user = validate_token(token)
   new_message_id = util.new_id()
   old_message = query(Message).filter(Message.id == old_message_id).first()
   if old_message is None:
@@ -176,45 +178,23 @@ def append_fragment(token, old_message_id, text):
   return new_message_id
 
 
-def get_message(token, message_id):
-  user = validate_token(token)
-  msg = query(Message).filter(Message.id == message_id).first()
-  if msg is None:
-    raise ValueError(f"No message with id: {message_id}")
-  if user.email not in {msg.author_email, msg.owner_email}:
-    raise ValueError(f"User {user.email} doesn't have permission to view "
-                     f"message: {message_id}")
-  return [f.text for f in msg.fragments]
-
-
-def set_message_owner(message_id, email):
-  """Updated message to have the specified owner.
-
-  Not intended for users to trigger.
-  """
-  msg = query(Message).filter(Message.id == message_id).first()
-  if msg is None:
-    raise ValueError(f"No message with id: {message_id}")
-  user = query(User).filter(User.email == email).first()
-  if user is None:
-    raise ValueError(f"No user with email: {email}")
-  msg.owner = user
-  commit()
-
-
-def find_close_random_user(user):
-  """Returns an email of a user who is located close to the recipient."""
-  near_users = query(User).filter(User.email != user.email).order_by(
-      func.sqrt(
-          func.pow(User.coordinate_x - user.coordinate_x, 2) +
-          func.pow(User.coordinate_y - user.coordinate_y, 2))).limit(10).all()
-  if not near_users:
-    raise ValueError("No near users identified.")
-  return random.choice(near_users)
-
-
 def user_may_receive_msg(user):
   """Returns true if the user hasn't received a msg recently."""
   if user.last_msg_received_timestamp is None:
     return True
   return user.last_msg_received_timestamp < util.now() - NEW_MESSAGE_MIN_DELTA
+
+
+def find_closest_unowned_msg(user):
+  """Finds a new message for the user that isn't yet owned."""
+  return query(Message).filter(
+      Message.owner_email == None,
+      Message.author_email != user.email).join(User, Message.author).order_by(
+          func.abs(User.coordinate_x - user.coordinate_x) +
+          func.abs(User.coordinate_y - user.coordinate_y)).first()
+
+
+def set_message_owner(user, message):
+  message.owner = user
+  user.last_msg_received_timestamp = util.now()
+  commit()

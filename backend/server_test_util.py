@@ -18,9 +18,11 @@ class ServerTestCase(TestCase):
     database.db.drop_all()
 
   def create_test_user(self, email):
-    """Returns an API key for testing."""
-    database.add(database.User(email=email))
+    """Returns a user object and api key for testing."""
+    user = database.User(email=email)
     token = util.generate_access_token()
+    database.add(user)
     database.add(
-        database.AccessToken(email=email, token=token, timestamp=util.now()))
-    return token
+        database.AccessToken(token=token, user=user, timestamp=util.now()))
+    database.commit()
+    return user, token

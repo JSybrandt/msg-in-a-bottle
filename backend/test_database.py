@@ -106,24 +106,20 @@ class DatabaseTest(server_test_util.ServerTestCase):
       database.close_login_request(email=email, secret_key=secret_key)
 
   def test_new_message(self):
-    token = self.create_test_user("test@gmail.com")
+    user, _ = self.create_test_user("test@gmail.com")
     expected_text = "test message here"
-    message_id = database.new_message(token, expected_text)
+    message_id = database.new_message(user, expected_text)
     message = database.query(
         database.Message).filter(database.Message.id == message_id).first()
     self.assertTrue(message is not None)
     self.assertEqual(len(message.fragments), 1)
     self.assertEqual(message.fragments[0].text, expected_text)
 
-  def test_new_messsage_bad_token(self):
-    with self.assertRaises(ValueError):
-      database.new_message(token=1234, text="new message text")
-
   def test_append_fragment(self):
-    token = self.create_test_user("test@gmail.com")
-    msg_id_1 = database.new_message(token, "first")
-    msg_id_2 = database.append_fragment(token, msg_id_1, "second")
-    msg_id_3 = database.append_fragment(token, msg_id_2, "third")
+    user, _ = self.create_test_user("test@gmail.com")
+    msg_id_1 = database.new_message(user, "first")
+    msg_id_2 = database.append_fragment(user, msg_id_1, "second")
+    msg_id_3 = database.append_fragment(user, msg_id_2, "third")
 
     msg_1 = database.query(
         database.Message).filter(database.Message.id == msg_id_1).first()
@@ -142,158 +138,56 @@ class DatabaseTest(server_test_util.ServerTestCase):
                      ["first", "second", "third"])
 
   def test_append_fragment_missing_old_msg(self):
-    token = self.create_test_user("test@gmail.com")
+    user, _ = self.create_test_user("test@gmail.com")
     with self.assertRaises(ValueError):
-      database.append_fragment(token, old_message_id=12345, text="bad_msg_id")
+      database.append_fragment(user, old_message_id=12345, text="bad_msg_id")
     self.assertEqual(database.query(database.Message).count(), 0)
 
-  def test_append_fragment_bad_token(self):
-    token = self.create_test_user("test@gmail.com")
-    message_id = database.new_message(token, "test message text")
+  def test_get_user_from_token(self):
+    user, token = self.create_test_user("test@gmail.com")
+    self.assertEqual(database.get_user_from_token(token), user)
+
+  def test_get_user_from_token(self):
     with self.assertRaises(ValueError):
-      database.append_fragment(
-          token=1234, old_message_id=message_id, text="new message text")
+      database.get_user_from_token("garbage token")
 
-  def test_get_message(self):
-    email = "test@gmail.com"
-    token = self.create_test_user(email)
-    message_id = database.new_message(token, "first")
-    self.assertEqual(database.get_message(token, message_id), ["first"])
-
-  def test_get_message_no_fragments(self):
-    email = "test@gmail.com"
-    token = self.create_test_user(email)
-    msg_id = 12345
-    database.add(database.Message(id=msg_id, author_email=email))
-    self.assertEqual(database.get_message(token, msg_id), [])
-
-  def test_get_message_bad_id(self):
-    token = self.create_test_user("test@gmail.com")
-    with self.assertRaises(ValueError):
-      database.get_message(token, message_id=9876)
-
-  def test_get_message_bad_token(self):
-    token = self.create_test_user("test@gmail.com")
-    message_id = database.new_message(token, "test message text")
-    with self.assertRaises(ValueError):
-      database.get_message(token=1234, message_id=message_id)
-
-  def test_validate_token_good(self):
-    email = "test@gmail.com"
-    token = self.create_test_user(email)
-    self.assertTrue(database.validate_token(token).email, email)
-
-  def test_validate_token_bad_value(self):
-    with self.assertRaises(ValueError):
-      database.validate_token("garbage token")
-
-  def test_validate_token_old_value(self):
+  def test_get_user_from_token_old_value(self):
     token = util.generate_access_token()
     long_ago = util.now() - 2 * database.VALID_TOKEN_DELTA
     database.add(
         database.AccessToken(
             email="test@gmail.com", token=token, timestamp=long_ago))
     with self.assertRaises(ValueError):
-      database.validate_token(token)
+      database.get_user_from_token(token)
 
   def test_set_owner(self):
-    token = self.create_test_user("author@gmail.com")
-    message_id = database.new_message(token, "test message")
-    owner_email = "owner@gmail.com"
-    self.create_test_user(owner_email)
-    database.set_message_owner(message_id, owner_email)
-
-    messages = database.query(database.Message).filter(
-        database.Message.owner_email == owner_email).all()
-    self.assertEqual(len(messages), 1)
-    self.assertEqual(messages[0].id, message_id)
-
-    user = database.query(
-        database.User).filter(database.User.email == owner_email).first()
-    self.assertTrue(user is not None)
-    self.assertEqual(len(user.owned_messages), 1)
-    self.assertEqual(user.owned_messages[0].id, message_id)
-
-  def test_set_owner_gives_read_permission(self):
-    author_token = self.create_test_user("author@gmail.com")
-    owner_token = self.create_test_user("owner@gmail.com")
-    message_id = database.new_message(author_token, "test message")
-    # Author can read..
-    self.assertEqual(
-        database.get_message(author_token, message_id), ["test message"])
-    # Owner can't yet.
-    with self.assertRaises(ValueError):
-      database.get_message(owner_token, message_id)
-    # Grant owner permission.
-    database.set_message_owner(message_id, "owner@gmail.com")
-    # Now it works
-    self.assertEqual(
-        database.get_message(owner_token, message_id), ["test message"])
+    author, _ = self.create_test_user("author@gmail.com")
+    owner, _ = self.create_test_user("owner@gmail.com")
+    message = database.Message(id=1, author=author)
+    database.add(message)
+    database.commit()
+    database.set_message_owner(owner, message)
+    database.refresh(message)
+    database.refresh(owner)
+    self.assertEqual(message.owner, owner)
+    self.assertEqual(owner.owned_messages, [message])
 
   def test_set_owner_overwrite(self):
-    message_id = database.new_message(
-        self.create_test_user("author@gmail.com"), "test message")
+    author, _ = self.create_test_user("author@gmail.com")
+    owner_1, _ = self.create_test_user("owner_1@gmail.com")
+    owner_2, _ = self.create_test_user("owner_2@gmail.com")
+    message = database.Message(id=1, author=author)
+    database.add(message)
+    database.commit()
 
-    email_1 = "owner_1@gmail.com"
-    self.create_test_user(email_1)
-    database.set_message_owner(message_id, email_1)
+    database.set_message_owner(owner_1, message)
+    database.set_message_owner(owner_2, message)
+    database.refresh(owner_1)
+    database.refresh(owner_2)
 
-    email_2 = "owner_2@gmail.com"
-    self.create_test_user(email_2)
-    database.set_message_owner(message_id, email_2)
-
-    user_1 = database.query(
-        database.User).filter(database.User.email == email_1).first()
-    user_2 = database.query(
-        database.User).filter(database.User.email == email_2).first()
-    message = database.query(
-        database.Message).filter(database.Message.id == message_id).first()
-
-    self.assertEqual(message.owner_email, email_2)
-    self.assertEqual(message.owner, user_2)
-    self.assertEqual(len(user_1.owned_messages), 0)
-    self.assertEqual(len(user_2.owned_messages), 1)
-
-  def test_set_owner_bad_email(self):
-    message_id = database.new_message(
-        self.create_test_user("author@gmail.com"), "test message")
-    with self.assertRaises(ValueError):
-      database.set_message_owner(message_id, "garbage@gmail.com")
-
-  def test_set_owner_message_id(self):
-    self.create_test_user("author@gmail.com")
-    with self.assertRaises(ValueError):
-      database.set_message_owner(message_id=123456, email="author@gmail.com")
-
-  def test_find_close_user_one_cadidate(self):
-    email_a = "a@gmail.com"
-    email_b = "b@gmail.com"
-    self.create_test_user(email_a)
-    self.create_test_user(email_b)
-    user_a = database.query(database.User).filter_by(email=email_a).one()
-    user_b = database.query(database.User).filter_by(email=email_b).one()
-    self.assertEqual(database.find_close_random_user(user_a), user_b)
-
-  def test_find_close_user_one_user(self):
-    email = "test@gmail.com"
-    self.create_test_user(email)
-    user = database.query(database.User).filter_by(email=email).one()
-    with self.assertRaises(ValueError):
-      database.find_close_random_user(user)
-
-  def test_find_close_user_ten_nearest_candidates(self):
-    users = [
-        database.User(email=str(i), coordinate_y=0, coordinate_x=i / 11)
-        for i in range(20)
-    ]
-    for u in users:
-      database.add(u)
-    seen_emails = set()
-    for _ in range(1000):
-      random_user = database.find_close_random_user(users[0])
-      seen_emails.add(random_user.email)
-    self.assertEqual(seen_emails,
-                     {"1", "2", "3", "4", "5", "6", "7", "8", "9", "10"})
+    self.assertEqual(message.owner, owner_2)
+    self.assertEqual(len(owner_1.owned_messages), 0)
+    self.assertEqual(len(owner_2.owned_messages), 1)
 
   def test_user_may_recieve_msg_new_user(self):
     user = database.User(
@@ -314,3 +208,25 @@ class DatabaseTest(server_test_util.ServerTestCase):
         email="recent_user@gmail.com", last_msg_received_timestamp=long_ago)
     database.add(user)
     self.assertFalse(database.user_may_receive_msg(user))
+
+  def test_retrieve_unowned_msg(self):
+    """The user should get the closest message."""
+    # Users arranged in a row.
+    users = [
+        database.User(email="0", coordinate_y=0, coordinate_x=0),
+        database.User(email="1", coordinate_y=0, coordinate_x=0.1),
+        database.User(email="2", coordinate_y=0, coordinate_x=0.2)
+    ]
+    for i, u in enumerate(users):
+      database.add(u)
+      database.add(database.Message(id=i, author=u))
+    # Own the closest message.
+    msg_1 = database.find_closest_unowned_msg(users[0])
+    self.assertEqual(msg_1.id, 1)
+    database.set_message_owner(users[0], msg_1)
+
+    msg_2 = database.find_closest_unowned_msg(users[0])
+    self.assertEqual(msg_2.id, 2)
+    database.set_message_owner(users[0], msg_2)
+
+    self.assertTrue(database.find_closest_unowned_msg(users[0]) is None)
