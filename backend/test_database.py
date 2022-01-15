@@ -220,3 +220,21 @@ class DatabaseTest(server_test_util.ServerTestCase):
     database.set_message_owner(users[0], msg_2)
 
     self.assertTrue(database.find_closest_unowned_msg(users[0]) is None)
+
+  def test_get_message(self):
+    user, _ = self.create_test_user("test@gmail.com")
+    expected_message = database.new_message(user, "test message")
+    self.assertEqual(
+        database.get_message(user, expected_message.id), expected_message)
+
+  def test_get_message_bad_id(self):
+    user, _ = self.create_test_user("test@gmail.com")
+    with self.assertRaises(ValueError):
+      database.get_message(user, 12345)
+
+  def test_get_message_bad_permission(self):
+    user, _ = self.create_test_user("test@gmail.com")
+    message = database.new_message(user, "test message")
+    bad_user, _ = self.create_test_user("bad_user@gmail.com")
+    with self.assertRaises(ValueError):
+      database.get_message(bad_user, message.id)

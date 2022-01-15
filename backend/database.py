@@ -194,3 +194,15 @@ def set_message_owner(user, message):
   message.owner = user
   user.last_msg_received_timestamp = util.now()
   commit()
+
+
+def get_message(user, message_id):
+  """Return a message if the user has permissions to view it."""
+  message = query(Message).filter(Message.id == message_id).first()
+  if message is None:
+    raise ValueError(f"No message with id: {message_id}")
+  if user not in {message.author, message.owner}:
+    raise ValueError(
+        f"User {user.email} does not have permission to view message {message_id}"
+    )
+  return message

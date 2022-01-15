@@ -10,13 +10,14 @@ class RoutesTest(server_test_util.ServerTestCase):
     response = self.client.post("/login")
     self.assertEqual(response.status_code, 400)
     self.assertTrue(response.is_json)
-    self.assertEqual(response.json, dict(error="Expected json-encoded post"))
+    self.assertEqual(response.json,
+                     dict(error="Expected request to be json encoded."))
 
   def test_login_json_empty(self):
     response = self.client.post("/login", json={})
     self.assertEqual(response.status_code, 400)
     self.assertTrue(response.is_json)
-    self.assertEqual(response.json, dict(error="Expected 'email' value"))
+    self.assertEqual(response.json, dict(error="Expected 'email' value."))
 
   def test_login_w_email_no_key(self):
     email = "test@gmail.com"
@@ -31,7 +32,7 @@ class RoutesTest(server_test_util.ServerTestCase):
   def test_login_w_email_good_secret_key(self):
     email = "test@gmail.com"
     secret_key = "ABC123"
-    database.db.session.add(
+    database.add(
         database.PendingLoginRequest(
             email=email, secret_key=secret_key, timestamp=util.now()))
     response = self.client.post(
@@ -49,7 +50,7 @@ class RoutesTest(server_test_util.ServerTestCase):
 
   def test_login_w_email_bad_secret_key(self):
     email = "test@gmail.com"
-    database.db.session.add(
+    database.add(
         database.PendingLoginRequest(
             email=email, secret_key="ABC123", timestamp=util.now()))
     response = self.client.post(
@@ -62,7 +63,7 @@ class RoutesTest(server_test_util.ServerTestCase):
     email = "test@gmail.com"
     secret_key = "ABC123"
     long_ago = util.now() - 2 * database.VALID_LOGIN_ATTEMPT_DELTA
-    database.db.session.add(
+    database.add(
         database.PendingLoginRequest(
             email=email, secret_key=secret_key, timestamp=long_ago))
     response = self.client.post(
@@ -70,3 +71,11 @@ class RoutesTest(server_test_util.ServerTestCase):
     self.assertTrue(response.is_json)
     self.assertEqual(response.status_code, 400)
     self.assertEqual(response.json, dict(error="Invalid secret key"))
+
+  def test_get_message(self):
+    user, token = self.create_test_user("author@gmail.com")
+    message = database.new_message(user, "test message")
+    response = self.client.get(
+        "/get-message", json=dict(token=token, message_id=message.id))
+    self.assertTrue(response.is_json)
+    self.assertEqual(response.json, dict(message=["test message"]))
