@@ -199,24 +199,22 @@ class DatabaseTest(server_test_util.ServerTestCase):
       database.assign_fresh_message(user_2, message)
 
   def test_user_may_recieve_msg_new_user(self):
-    user = database.User(
-        email="new_user@gmail.com", last_msg_received_timestamp=None)
-    database.add(user)
-    self.assertTrue(database.user_may_receive_msg(user))
+    user, _ = self.create_test_user("test@gmail.com")
+    self.assertTrue(database.allowed_to_recieve_msg(user))
 
   def test_user_may_recieve_msg_returning_user(self):
     long_ago = util.now() - 2 * database.NEW_MESSAGE_MIN_DELTA
     user = database.User(
         email="old_user@gmail.com", last_msg_received_timestamp=long_ago)
     database.add(user)
-    self.assertTrue(database.user_may_receive_msg(user))
+    self.assertTrue(database.allowed_to_recieve_msg(user))
 
   def test_user_may_recieve_msg_recent_user(self):
     long_ago = util.now() - 0.5 * database.NEW_MESSAGE_MIN_DELTA
     user = database.User(
         email="recent_user@gmail.com", last_msg_received_timestamp=long_ago)
     database.add(user)
-    self.assertFalse(database.user_may_receive_msg(user))
+    self.assertFalse(database.allowed_to_recieve_msg(user))
 
   def test_retrieve_only_closest_msg(self):
     """The user should get the closest message."""
@@ -273,5 +271,15 @@ class DatabaseTest(server_test_util.ServerTestCase):
     bad_user, _ = self.create_test_user("bad_user@gmail.com")
     with self.assertRaises(ValueError):
       database.get_message(bad_user, message.id)
+
+  def test_user_may_not_retrive_affter_getting_a_msg(self):
+    author, _ = self.create_test_user("author@gmail.com")
+    msg_1 = database.new_message(author, "msg 1")
+    user, _ = self.create_test_user("user@gmail.com")
+    database.assign_fresh_message(user, msg_1)
+    msg_2 = database.new_message(author, "msg 2")
+    self.assertFalse(database.allowed_to_recieve_msg(user))
+
+
 
   # Need to make sure that a message that was appended to doesn't get assigned to anyone.

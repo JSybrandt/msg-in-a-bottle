@@ -74,7 +74,7 @@ def overview():
   data = validate_json_data()
   token = validate_field(data, "token")
   user = database.get_user_from_token(token)
-  if database.user_may_receive_msg(user):
+  if database.allowed_to_recieve_msg(user):
     fresh_msg = database.find_closest_fresh_msg(user)
     if fresh_msg is not None:
       database.assign_fresh_message(user, fresh_msg)

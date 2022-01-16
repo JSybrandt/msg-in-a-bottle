@@ -170,3 +170,16 @@ class RoutesTest(server_test_util.ServerTestCase):
     self.assertEqual(
         response.json,
         dict(authored_message_ids=[1, 2], may_append_message_ids=[3, 4]))
+
+  def test_get_overview_assigns_fresh_messages(self):
+    author, _ = self.create_test_user("author@gmail.com")
+    new_msg = database.new_message(author, "test message")
+    user, token = self.create_test_user("user@gmail.com")
+    self.assertTrue(database.allowed_to_recieve_msg(user))
+    response = self.client.get("/", json=dict(token=token))
+    self.assertTrue(response.is_json)
+    self.assertEqual(
+        response.json,
+        dict(authored_message_ids=[], may_append_message_ids=[new_msg.id]))
+    database.refresh(user)
+    self.assertEqual(user.may_append_messages, [new_msg])

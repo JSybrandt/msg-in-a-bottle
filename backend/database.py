@@ -64,7 +64,7 @@ class User(db.Model):
   coordinate_y = db.Column(db.Float, nullable=False, default=random.random)
   creation_timestamp = db.Column(db.DateTime, nullable=False, default=util.now)
   last_msg_received_timestamp = db.Column(
-      db.DateTime, nullable=True, default=util.now)
+      db.DateTime, nullable=True)
 
 
 class PendingLoginRequest(db.Model):
@@ -181,7 +181,7 @@ def append_fragment(user, old_message, text):
   return msg
 
 
-def user_may_receive_msg(user):
+def allowed_to_recieve_msg(user):
   """Returns true if the user hasn't received a msg recently."""
   if user.last_msg_received_timestamp is None:
     return True
