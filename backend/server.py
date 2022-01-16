@@ -40,4 +40,5 @@ def create_app(**config_overwrites):
 def run_app(app=None):
   if app is None:
     app = create_app()
+    database.db.create_all()
   app.run(threaded=True, **_get_run_args())
