@@ -173,7 +173,7 @@ class DatabaseTest(server_test_util.ServerTestCase):
     self.assertEqual(message.owner, owner)
     self.assertEqual(owner.owned_messages, [message])
 
-  def test_set_owner_overwrite(self):
+  def test_set_owner_overwrite_fails(self):
     author, _ = self.create_test_user("author@gmail.com")
     owner_1, _ = self.create_test_user("owner_1@gmail.com")
     owner_2, _ = self.create_test_user("owner_2@gmail.com")
@@ -182,13 +182,22 @@ class DatabaseTest(server_test_util.ServerTestCase):
     database.commit()
 
     database.set_message_owner(owner_1, message)
-    database.set_message_owner(owner_2, message)
+    # This message isn't fresh
+    with self.assertRaises(ValueError):
+      database.set_message_owner(owner_2, message)
+
     database.refresh(owner_1)
     database.refresh(owner_2)
+    self.assertEqual(message.owner, owner_1)
+    self.assertEqual(len(owner_1.owned_messages), 1)
+    self.assertEqual(len(owner_2.owned_messages), 0)
 
-    self.assertEqual(message.owner, owner_2)
-    self.assertEqual(len(owner_1.owned_messages), 0)
-    self.assertEqual(len(owner_2.owned_messages), 1)
+    # This message still isn't fresh
+    message.owner = None
+    database.commit()
+    with self.assertRaises(ValueError):
+      database.set_message_owner(owner_2, message)
+
 
   def test_user_may_recieve_msg_new_user(self):
     user = database.User(
@@ -210,7 +219,7 @@ class DatabaseTest(server_test_util.ServerTestCase):
     database.add(user)
     self.assertFalse(database.user_may_receive_msg(user))
 
-  def test_retrieve_unowned_msg(self):
+  def test_retrieve_only_closest_msg(self):
     """The user should get the closest message."""
     # Users arranged in a row.
     users = [
@@ -222,15 +231,35 @@ class DatabaseTest(server_test_util.ServerTestCase):
       database.add(u)
       database.add(database.Message(id=i, author=u))
     # Own the closest message.
-    msg_1 = database.find_closest_unowned_msg(users[0])
+    msg_1 = database.find_closest_fresh_msg(users[0])
     self.assertEqual(msg_1.id, 1)
     database.set_message_owner(users[0], msg_1)
 
-    msg_2 = database.find_closest_unowned_msg(users[0])
+    msg_2 = database.find_closest_fresh_msg(users[0])
     self.assertEqual(msg_2.id, 2)
     database.set_message_owner(users[0], msg_2)
 
-    self.assertTrue(database.find_closest_unowned_msg(users[0]) is None)
+    self.assertTrue(database.find_closest_fresh_msg(users[0]) is None)
+
+  def test_retrieve_only_fresh_msg(self):
+    author, _ = self.create_test_user("author@gmail.com")
+    owner, _ = self.create_test_user("owner@gmail.com")
+
+    fresh_msg = database.new_message(author, "fresh")
+    not_fresh_msg = database.new_message(author, "not fresh")
+    not_fresh_msg.fresh = False
+    database.commit()
+
+    closest_msg = database.find_closest_fresh_msg(owner)
+    self.assertEqual(closest_msg, fresh_msg)
+
+    # once owner is set, its no longer a fresh msg.
+    database.set_message_owner(owner, closest_msg)
+    self.assertTrue(database.find_closest_fresh_msg(owner) is None)
+
+
+
+
 
   def test_get_message(self):
     user, _ = self.create_test_user("test@gmail.com")
@@ -251,3 +280,4 @@ class DatabaseTest(server_test_util.ServerTestCase):
       database.get_message(bad_user, message.id)
 
   # Need to make sure that a message that was appended to doesn't get assigned to anyone.
+

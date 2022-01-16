@@ -100,6 +100,8 @@ class Message(db.Model):
       db.String(EMAIL_MAX_LENGTH), db.ForeignKey(User.email), nullable=True)
   author_email = db.Column(
       db.String(EMAIL_MAX_LENGTH), db.ForeignKey(User.email), nullable=False)
+  # Fresh messages are still looking for an owner.
+  fresh = db.Column(db.Boolean, nullable=False, default=True)
   owner = db.relationship(
       User,
       foreign_keys=owner_email,
@@ -184,17 +186,21 @@ def user_may_receive_msg(user):
   return user.last_msg_received_timestamp < util.now() - NEW_MESSAGE_MIN_DELTA
 
 
-def find_closest_unowned_msg(user):
+def find_closest_fresh_msg(user):
   """Finds a new message for the user that isn't yet owned."""
   return query(Message).filter(
       Message.owner_email == None,
-      Message.author_email != user.email).join(User, Message.author).order_by(
+      Message.author_email != user.email,
+      Message.fresh).join(User, Message.author).order_by(
           func.abs(User.coordinate_x - user.coordinate_x) +
           func.abs(User.coordinate_y - user.coordinate_y)).first()
 
 
 def set_message_owner(user, message):
+  if not message.fresh:
+    raise ValueError(f"Message {message.id} isn't fresh.")
   message.owner = user
+  message.fresh = False
   user.last_msg_received_timestamp = util.now()
   commit()
 
