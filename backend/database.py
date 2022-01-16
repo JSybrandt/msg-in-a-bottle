@@ -39,9 +39,9 @@ def init_app(app, config_overwrites):
   db.init_app(app)
 
 
-VALID_LOGIN_ATTEMPT_DELTA = timedelta(minutes=5)
-VALID_TOKEN_DELTA = timedelta(days=10)
-NEW_MESSAGE_MIN_DELTA = timedelta(days=1)
+VALID_LOGIN_ATTEMPT_DELTA = timedelta(minutes=10)
+VALID_TOKEN_DELTA = timedelta(days=30)
+ASSIGN_MSG_MIN_DELTA = timedelta(hours=8)
 
 EMAIL_MAX_LENGTH = 120
 NAME_MAX_LENGTH = 50
@@ -190,7 +190,7 @@ def allowed_to_recieve_msg(user):
   """Returns true if the user hasn't received a msg recently."""
   if user.last_msg_received_timestamp is None:
     return True
-  return user.last_msg_received_timestamp < util.now() - NEW_MESSAGE_MIN_DELTA
+  return user.last_msg_received_timestamp < util.now() - ASSIGN_MSG_MIN_DELTA
 
 
 def find_closest_fresh_msg(user):

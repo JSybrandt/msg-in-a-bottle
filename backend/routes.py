@@ -35,8 +35,9 @@ def login():
   secret_key = data.get("secret_key")
   if secret_key is None:
     new_key = database.open_login_request(email)
-    mail.send_mail("Msg in a Bottle: Temporary Password",
-                   f"Your temporary password is: {new_key}", [email])
+    mail.send_mail(
+        "Message in a Bottle: Secret Key",
+        f"Your secret key is: {new_key}.\nIt is valid for 10 minutes.", [email])
     return jsonify(status="new-login")
   else:
     token = database.close_login_request(email, secret_key)

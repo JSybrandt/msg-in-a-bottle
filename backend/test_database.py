@@ -215,14 +215,14 @@ class DatabaseTest(server_test_util.ServerTestCase):
     self.assertTrue(database.allowed_to_recieve_msg(user))
 
   def test_user_may_recieve_msg_returning_user(self):
-    long_ago = util.now() - 2 * database.NEW_MESSAGE_MIN_DELTA
+    long_ago = util.now() - 2 * database.ASSIGN_MSG_MIN_DELTA
     user = database.User(
         email="old_user@gmail.com", last_msg_received_timestamp=long_ago)
     database.add(user)
     self.assertTrue(database.allowed_to_recieve_msg(user))
 
   def test_user_may_recieve_msg_recent_user(self):
-    long_ago = util.now() - 0.5 * database.NEW_MESSAGE_MIN_DELTA
+    long_ago = util.now() - 0.5 * database.ASSIGN_MSG_MIN_DELTA
     user = database.User(
         email="recent_user@gmail.com", last_msg_received_timestamp=long_ago)
     database.add(user)
