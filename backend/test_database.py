@@ -280,6 +280,4 @@ class DatabaseTest(server_test_util.ServerTestCase):
     msg_2 = database.new_message(author, "msg 2")
     self.assertFalse(database.allowed_to_recieve_msg(user))
 
-
-
   # Need to make sure that a message that was appended to doesn't get assigned to anyone.

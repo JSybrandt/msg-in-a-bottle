@@ -183,3 +183,16 @@ class RoutesTest(server_test_util.ServerTestCase):
         dict(authored_message_ids=[], may_append_message_ids=[new_msg.id]))
     database.refresh(user)
     self.assertEqual(user.may_append_messages, [new_msg])
+
+  def test_get_overview_does_not_assign_msg_too_Freq(self):
+    author, _ = self.create_test_user("author@gmail.com")
+    new_msg = database.new_message(author, "test message")
+    user, token = self.create_test_user("user@gmail.com")
+    # Simulate that the user just got a msg.
+    user.last_msg_received_timestamp = util.now()
+    database.commit()
+    self.assertFalse(database.allowed_to_recieve_msg(user))
+    response = self.client.get("/", json=dict(token=token))
+    self.assertTrue(response.is_json)
+    self.assertEqual(response.json,
+                     dict(authored_message_ids=[], may_append_message_ids=[]))

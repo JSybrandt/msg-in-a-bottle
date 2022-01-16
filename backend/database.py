@@ -63,8 +63,7 @@ class User(db.Model):
   coordinate_x = db.Column(db.Float, nullable=False, default=random.random)
   coordinate_y = db.Column(db.Float, nullable=False, default=random.random)
   creation_timestamp = db.Column(db.DateTime, nullable=False, default=util.now)
-  last_msg_received_timestamp = db.Column(
-      db.DateTime, nullable=True)
+  last_msg_received_timestamp = db.Column(db.DateTime, nullable=True)
 
 
 class PendingLoginRequest(db.Model):
