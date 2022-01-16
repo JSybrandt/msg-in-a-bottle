@@ -63,6 +63,18 @@ class DatabaseTest(server_test_util.ServerTestCase):
     self.assertGreater(access_token.timestamp, pre_close_time)
     self.assertLess(access_token.timestamp, post_close_time)
 
+  def test_login_is_case_insensitive(self):
+    email = "test@gmail.com"
+    secret_key = database.open_login_request(email=email)
+    token = database.close_login_request(
+        email=email, secret_key=secret_key.lower())
+    actual = database.query(
+        database.AccessToken).filter(database.AccessToken.token == token).all()
+    actual_emails = [t.email for t in actual]
+    actual_tokens = [t.token for t in actual]
+    self.assertEqual(actual_emails, [email])
+    self.assertEqual(actual_tokens, [token])
+
   def test_new_user_after_first_login(self):
     email = "test@gmail.com"
     secret_key = database.open_login_request(email=email)
