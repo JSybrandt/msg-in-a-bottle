@@ -117,9 +117,9 @@ class DatabaseTest(server_test_util.ServerTestCase):
   def test_append_fragment(self):
     user, _ = self.create_test_user("test@gmail.com")
     msg_1 = database.new_message(user, "first")
-    msg_1.owner = user
+    msg_1.may_append_user = user
     msg_2 = database.append_fragment(user, msg_1, "second")
-    msg_2.owner = user
+    msg_2.may_append_user = user
     msg_3 = database.append_fragment(user, msg_2, "third")
 
     self.assertEqual([f.text for f in msg_1.fragments], ["first"])
@@ -127,18 +127,18 @@ class DatabaseTest(server_test_util.ServerTestCase):
     self.assertEqual([f.text for f in msg_3.fragments],
                      ["first", "second", "third"])
 
-  def test_append_fragment_bad_owner(self):
+  def test_append_fragment_bad_user(self):
     user, _ = self.create_test_user("test@gmail.com")
     msg = database.new_message(user, "test")
     with self.assertRaises(ValueError):
-      database.append_fragment(user, msg, text="user isn't owner")
+      database.append_fragment(user, msg, text="user isn't may_append_user")
 
   def test_append_fragment_twice_fails(self):
     """You should lose permissions after appending a message."""
     user, _ = self.create_test_user("test@gmail.com")
     original_msg = database.new_message(user, "first")
     appender, _ = self.create_test_user("appender@gmail.com")
-    original_msg.owner = appender
+    original_msg.may_append_user = appender
     # This should work without error.
     database.append_fragment(appender, original_msg, "good append")
     with self.assertRaises(ValueError):
@@ -161,42 +161,42 @@ class DatabaseTest(server_test_util.ServerTestCase):
     with self.assertRaises(ValueError):
       database.get_user_from_token(token)
 
-  def test_set_owner(self):
+  def test_assign_fresh_message(self):
     author, _ = self.create_test_user("author@gmail.com")
-    owner, _ = self.create_test_user("owner@gmail.com")
+    may_append_user, _ = self.create_test_user("may_append_user@gmail.com")
     message = database.Message(id=1, author=author)
     database.add(message)
     database.commit()
-    database.set_message_owner(owner, message)
+    database.assign_fresh_message(may_append_user, message)
     database.refresh(message)
-    database.refresh(owner)
-    self.assertEqual(message.owner, owner)
-    self.assertEqual(owner.owned_messages, [message])
+    database.refresh(may_append_user)
+    self.assertEqual(message.may_append_user, may_append_user)
+    self.assertEqual(may_append_user.may_append_messages, [message])
 
-  def test_set_owner_overwrite_fails(self):
+  def test_set_assign_fresh_message_not_fresh(self):
     author, _ = self.create_test_user("author@gmail.com")
-    owner_1, _ = self.create_test_user("owner_1@gmail.com")
-    owner_2, _ = self.create_test_user("owner_2@gmail.com")
+    user_1, _ = self.create_test_user("user_1@gmail.com")
+    user_2, _ = self.create_test_user("@gmail.2_resucom")
     message = database.Message(id=1, author=author)
     database.add(message)
     database.commit()
 
-    database.set_message_owner(owner_1, message)
+    database.assign_fresh_message(user_1, message)
     # This message isn't fresh
     with self.assertRaises(ValueError):
-      database.set_message_owner(owner_2, message)
+      database.assign_fresh_message(user_2, message)
 
-    database.refresh(owner_1)
-    database.refresh(owner_2)
-    self.assertEqual(message.owner, owner_1)
-    self.assertEqual(len(owner_1.owned_messages), 1)
-    self.assertEqual(len(owner_2.owned_messages), 0)
+    database.refresh(user_1)
+    database.refresh(user_2)
+    self.assertEqual(message.may_append_user, user_1)
+    self.assertEqual(len(user_1.may_append_messages), 1)
+    self.assertEqual(len(user_2.may_append_messages), 0)
 
     # This message still isn't fresh
-    message.owner = None
+    message.may_append_user = None
     database.commit()
     with self.assertRaises(ValueError):
-      database.set_message_owner(owner_2, message)
+      database.assign_fresh_message(user_2, message)
 
   def test_user_may_recieve_msg_new_user(self):
     user = database.User(
@@ -232,29 +232,29 @@ class DatabaseTest(server_test_util.ServerTestCase):
     # Own the closest message.
     msg_1 = database.find_closest_fresh_msg(users[0])
     self.assertEqual(msg_1.id, 1)
-    database.set_message_owner(users[0], msg_1)
+    database.assign_fresh_message(users[0], msg_1)
 
     msg_2 = database.find_closest_fresh_msg(users[0])
     self.assertEqual(msg_2.id, 2)
-    database.set_message_owner(users[0], msg_2)
+    database.assign_fresh_message(users[0], msg_2)
 
     self.assertTrue(database.find_closest_fresh_msg(users[0]) is None)
 
   def test_retrieve_only_fresh_msg(self):
     author, _ = self.create_test_user("author@gmail.com")
-    owner, _ = self.create_test_user("owner@gmail.com")
+    may_append_user, _ = self.create_test_user("may_append_user@gmail.com")
 
     fresh_msg = database.new_message(author, "fresh")
     not_fresh_msg = database.new_message(author, "not fresh")
     not_fresh_msg.fresh = False
     database.commit()
 
-    closest_msg = database.find_closest_fresh_msg(owner)
+    closest_msg = database.find_closest_fresh_msg(may_append_user)
     self.assertEqual(closest_msg, fresh_msg)
 
-    # once owner is set, its no longer a fresh msg.
-    database.set_message_owner(owner, closest_msg)
-    self.assertTrue(database.find_closest_fresh_msg(owner) is None)
+    # once may_append_user is set, its no longer a fresh msg.
+    database.assign_fresh_message(may_append_user, closest_msg)
+    self.assertTrue(database.find_closest_fresh_msg(may_append_user) is None)
 
   def test_get_message(self):
     user, _ = self.create_test_user("test@gmail.com")

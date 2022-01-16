@@ -95,18 +95,17 @@ class Message(db.Model):
   id = db.Column(db.Integer, primary_key=True, default=util.new_id)
   fragments = db.relationship(
       MessageFragment, secondary=message_to_fragment_table, lazy=True)
-  # TODO: Rename owner to may_append_user
-  owner_email = db.Column(
+  may_append_email = db.Column(
       db.String(EMAIL_MAX_LENGTH), db.ForeignKey(User.email), nullable=True)
   author_email = db.Column(
       db.String(EMAIL_MAX_LENGTH), db.ForeignKey(User.email), nullable=False)
-  # Fresh messages are still looking for an owner.
+  # Fresh messages are still looking for an may_append_user.
   fresh = db.Column(db.Boolean, nullable=False, default=True)
-  owner = db.relationship(
+  may_append_user = db.relationship(
       User,
-      foreign_keys=owner_email,
+      foreign_keys=may_append_email,
       lazy=True,
-      backref=db.backref("owned_messages", lazy=True))
+      backref=db.backref("may_append_messages", lazy=True))
   author = db.relationship(
       User,
       foreign_keys=author_email,
@@ -166,14 +165,15 @@ def new_message(user, text):
 
 def append_fragment(user, old_message, text):
   """Adds new message with a new fragment appended. Returns new msg."""
-  if old_message.owner != user:
+  if old_message.may_append_user != user:
     raise ValueError(
-        f"User {user.email} is not the owner of message: {old_message.id}")
+        f"User {user.email} is not the may_append_user of message: {old_message.id}"
+    )
   new_fragments = old_message.fragments.copy()
   new_fragments.append(MessageFragment(text=text, author=user))
   msg = Message(fragments=new_fragments, author=user)
   # This old message may no longer be appended to.
-  old_message.owner = None
+  old_message.may_append_user = None
   add(msg)
   commit()
   return msg
@@ -189,16 +189,16 @@ def user_may_receive_msg(user):
 def find_closest_fresh_msg(user):
   """Finds a new message for the user that isn't yet owned."""
   return query(Message).filter(
-      Message.owner_email == None, Message.author_email != user.email,
+      Message.may_append_email == None, Message.author_email != user.email,
       Message.fresh).join(User, Message.author).order_by(
           func.abs(User.coordinate_x - user.coordinate_x) +
           func.abs(User.coordinate_y - user.coordinate_y)).first()
 
 
-def set_message_owner(user, message):
+def assign_fresh_message(user, message):
   if not message.fresh:
     raise ValueError(f"Message {message.id} isn't fresh.")
-  message.owner = user
+  message.may_append_user = user
   message.fresh = False
   user.last_msg_received_timestamp = util.now()
   commit()
@@ -209,7 +209,7 @@ def get_message(user, message_id):
   message = query(Message).filter(Message.id == message_id).first()
   if message is None:
     raise ValueError(f"No message with id: {message_id}")
-  if user not in {message.author, message.owner}:
+  if user not in {message.author, message.may_append_user}:
     raise ValueError(
         f"User {user.email} does not have permission to view message {message_id}"
     )

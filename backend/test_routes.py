@@ -110,7 +110,7 @@ class RoutesTest(server_test_util.ServerTestCase):
     self.assertEqual(len(messages), 1)
     self.assertEqual(messages[0].author, user)
     self.assertEqual([f.text for f in messages[0].fragments], ["test message"])
-    self.assertTrue(messages[0].owner is None)
+    self.assertTrue(messages[0].may_append_user is None)
     self.assertTrue("message_id" in response.json)
     self.assertEqual(messages[0].id, response.json["message_id"])
     database.refresh(user)
@@ -118,16 +118,15 @@ class RoutesTest(server_test_util.ServerTestCase):
 
   def test_send_append_message(self):
     author, _ = self.create_test_user("author@gmail.com")
-    owner, owner_token = self.create_test_user("owner@gmail.com")
+    may_append_user, token = self.create_test_user("may_append_user@gmail.com")
     database.add(
         database.Message(
             id=123,
             fragments=[database.MessageFragment(text="first", author=author)],
             author=author,
-            owner=owner))
+            may_append_user=may_append_user))
     response = self.client.post(
-        "/send-message",
-        json=dict(token=owner_token, message_id=123, text="second"))
+        "/send-message", json=dict(token=token, message_id=123, text="second"))
     new_messages = database.query(
         database.Message).filter(database.Message.id != 123).all()
     self.assertEqual(len(new_messages), 1)
