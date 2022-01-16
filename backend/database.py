@@ -42,6 +42,7 @@ def init_app(app, config_overwrites):
 VALID_LOGIN_ATTEMPT_DELTA = timedelta(minutes=10)
 VALID_TOKEN_DELTA = timedelta(days=30)
 ASSIGN_MSG_MIN_DELTA = timedelta(hours=8)
+MAX_MAY_APPEND_MESSAGES = 3
 
 EMAIL_MAX_LENGTH = 120
 NAME_MAX_LENGTH = 50
@@ -188,6 +189,8 @@ def append_fragment(user, old_message, text):
 
 def allowed_to_recieve_msg(user):
   """Returns true if the user hasn't received a msg recently."""
+  if len(user.may_append_messages) >= MAX_MAY_APPEND_MESSAGES:
+    return False
   if user.last_msg_received_timestamp is None:
     return True
   return user.last_msg_received_timestamp < util.now() - ASSIGN_MSG_MIN_DELTA
@@ -205,6 +208,9 @@ def find_closest_fresh_msg(user):
 def assign_fresh_message(user, message):
   if not message.fresh:
     raise ValueError(f"Message {message.id} isn't fresh.")
+  if len(user.may_append_messages) >= MAX_MAY_APPEND_MESSAGES:
+    raise ValueError(
+        f"User {user.email} already has too many pending messages.")
   message.may_append_user = user
   message.fresh = False
   user.last_msg_received_timestamp = util.now()

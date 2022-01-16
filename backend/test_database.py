@@ -299,4 +299,20 @@ class DatabaseTest(server_test_util.ServerTestCase):
     database.refresh(user)
     self.assertEqual(user.name, "Jeff")
 
+  def test_max_may_append_messages(self):
+    author, _ = self.create_test_user("author@gmail.com")
+    user, _ = self.create_test_user("user@gmail.com")
+    for i in range(database.MAX_MAY_APPEND_MESSAGES):
+      msg = database.new_message(author, f"Test Message {i}")
+      self.assertTrue(database.allowed_to_recieve_msg(user))
+      database.assign_fresh_message(user, msg)
+      self.assertEqual(len(user.may_append_messages), i + 1)
+      # For testing, assume a lot of time has passed between msgs.
+      user.last_msg_received_timestamp = None
+    # Now, the user should be full
+    self.assertFalse(database.allowed_to_recieve_msg(user))
+    msg = database.new_message(author, f"Test last message.")
+    with self.assertRaises(ValueError):
+      database.assign_fresh_message(user, msg)
+
   # Need to make sure that a message that was appended to doesn't get assigned to anyone.
