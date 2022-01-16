@@ -151,3 +151,22 @@ class RoutesTest(server_test_util.ServerTestCase):
         dict(
             error="User may_append_user@gmail.com does not have permission to view "
             "message 123"))
+
+  def test_get_overview(self):
+    author, _ = self.create_test_user("author@gmail.com")
+    user, token = self.create_test_user("user@gmail.com")
+    user.authored_messages = [
+        database.Message(id=1, author=user),
+        database.Message(id=2, author=user)
+    ]
+    user.may_append_messages = [
+        database.Message(id=3, author=author, may_append_user=user),
+        database.Message(id=4, author=author, may_append_user=user)
+    ]
+    database.commit()
+
+    response = self.client.get("/", json=dict(token=token))
+    self.assertTrue(response.is_json)
+    self.assertEqual(
+        response.json,
+        dict(authored_message_ids=[1, 2], may_append_message_ids=[3, 4]))
