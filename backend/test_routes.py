@@ -158,6 +158,7 @@ class RoutesTest(server_test_util.ServerTestCase):
   def test_get_overview(self):
     author, _ = self.create_test_user("author@gmail.com")
     user, token = self.create_test_user("user@gmail.com")
+    database.rename(user, "User Name")
     user.authored_messages = [
         database.Message(id=1, author=user),
         database.Message(id=2, author=user)
@@ -172,7 +173,10 @@ class RoutesTest(server_test_util.ServerTestCase):
     self.assertTrue(response.is_json)
     self.assertEqual(
         response.json,
-        dict(authored_message_ids=[1, 2], may_append_message_ids=[3, 4]))
+        dict(
+            authored_message_ids=[1, 2],
+            may_append_message_ids=[3, 4],
+            user_name="User Name"))
 
   def test_get_overview_assigns_fresh_messages(self):
     author, _ = self.create_test_user("author@gmail.com")
@@ -183,7 +187,10 @@ class RoutesTest(server_test_util.ServerTestCase):
     self.assertTrue(response.is_json)
     self.assertEqual(
         response.json,
-        dict(authored_message_ids=[], may_append_message_ids=[new_msg.id]))
+        dict(
+            authored_message_ids=[],
+            may_append_message_ids=[new_msg.id],
+            user_name=None))
     database.refresh(user)
     self.assertEqual(user.may_append_messages, [new_msg])
 
@@ -197,8 +204,10 @@ class RoutesTest(server_test_util.ServerTestCase):
     self.assertFalse(database.allowed_to_recieve_msg(user))
     response = self.client.get("/", json=dict(token=token))
     self.assertTrue(response.is_json)
-    self.assertEqual(response.json,
-                     dict(authored_message_ids=[], may_append_message_ids=[]))
+    self.assertEqual(
+        response.json,
+        dict(
+            authored_message_ids=[], may_append_message_ids=[], user_name=None))
 
   def test_rename(self):
     user, token = self.create_test_user("test@gmail.com")

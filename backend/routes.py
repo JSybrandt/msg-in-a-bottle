@@ -86,7 +86,8 @@ def overview():
   may_append_message_ids = [m.id for m in user.may_append_messages]
   return jsonify(
       authored_message_ids=authored_message_ids,
-      may_append_message_ids=may_append_message_ids)
+      may_append_message_ids=may_append_message_ids,
+      user_name=user.name)
 
 
 @blueprint.route("/rename", methods=["POST"])
