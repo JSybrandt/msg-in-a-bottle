@@ -169,6 +169,8 @@ def append_fragment(user, old_message, text):
     raise ValueError(
         f"User {user.email} is not the may_append_user of message: {old_message.id}"
     )
+  if not old_message.fresh:
+    raise ValueError(f"Message {old_message.id} is not fresh.")
   new_fragments = old_message.fragments.copy()
   new_fragments.append(MessageFragment(text=text, author=user))
   msg = Message(fragments=new_fragments, author=user)

@@ -133,3 +133,21 @@ class RoutesTest(server_test_util.ServerTestCase):
     self.assertTrue(response.is_json)
     self.assertEqual([f.text for f in new_messages[0].fragments],
                      ["first", "second"])
+
+  def test_send_append_message_bad_permissions(self):
+    author, _ = self.create_test_user("author@gmail.com")
+    may_append_user, token = self.create_test_user("may_append_user@gmail.com")
+    database.add(
+        database.Message(
+            id=123,
+            fragments=[database.MessageFragment(text="first", author=author)],
+            author=author,
+            may_append_user=None))
+    response = self.client.post(
+        "/send-message", json=dict(token=token, message_id=123, text="second"))
+    self.assertTrue(response.is_json)
+    self.assertEqual(
+        response.json,
+        dict(
+            error="User may_append_user@gmail.com does not have permission to view "
+            "message 123"))
