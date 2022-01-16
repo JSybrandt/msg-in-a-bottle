@@ -79,3 +79,24 @@ class RoutesTest(server_test_util.ServerTestCase):
         "/get-message", json=dict(token=token, message_id=message.id))
     self.assertTrue(response.is_json)
     self.assertEqual(response.json, dict(message=["test message"]))
+
+  def test_get_message_bad_user(self):
+    user, _ = self.create_test_user("author@gmail.com")
+    bad_user, bad_token = self.create_test_user("bad_user@gmail.com")
+    message = database.new_message(user, "test message")
+    response = self.client.get(
+        "/get-message", json=dict(token=bad_token, message_id=message.id))
+    self.assertTrue(response.is_json)
+    self.assertEqual(response.status_code, 400)
+    self.assertEqual(
+        response.json,
+        dict(error="User bad_user@gmail.com does not have permission to view "
+             f"message {message.id}"))
+
+  def test_get_message_bad_id(self):
+    user, token = self.create_test_user("author@gmail.com")
+    response = self.client.get(
+        "/get-message", json=dict(token=token, message_id=123))
+    self.assertTrue(response.is_json)
+    self.assertEqual(response.status_code, 400)
+    self.assertEqual(response.json, dict(error="No message with id: 123"))
