@@ -198,7 +198,6 @@ class DatabaseTest(server_test_util.ServerTestCase):
     with self.assertRaises(ValueError):
       database.set_message_owner(owner_2, message)
 
-
   def test_user_may_recieve_msg_new_user(self):
     user = database.User(
         email="new_user@gmail.com", last_msg_received_timestamp=None)
@@ -257,10 +256,6 @@ class DatabaseTest(server_test_util.ServerTestCase):
     database.set_message_owner(owner, closest_msg)
     self.assertTrue(database.find_closest_fresh_msg(owner) is None)
 
-
-
-
-
   def test_get_message(self):
     user, _ = self.create_test_user("test@gmail.com")
     expected_message = database.new_message(user, "test message")
@@ -280,4 +275,3 @@ class DatabaseTest(server_test_util.ServerTestCase):
       database.get_message(bad_user, message.id)
 
   # Need to make sure that a message that was appended to doesn't get assigned to anyone.
-

@@ -189,8 +189,7 @@ def user_may_receive_msg(user):
 def find_closest_fresh_msg(user):
   """Finds a new message for the user that isn't yet owned."""
   return query(Message).filter(
-      Message.owner_email == None,
-      Message.author_email != user.email,
+      Message.owner_email == None, Message.author_email != user.email,
       Message.fresh).join(User, Message.author).order_by(
           func.abs(User.coordinate_x - user.coordinate_x) +
           func.abs(User.coordinate_y - user.coordinate_y)).first()
