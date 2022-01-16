@@ -95,6 +95,7 @@ class Message(db.Model):
   id = db.Column(db.Integer, primary_key=True, default=util.new_id)
   fragments = db.relationship(
       MessageFragment, secondary=message_to_fragment_table, lazy=True)
+  # TODO: Rename owner to may_append_user
   owner_email = db.Column(
       db.String(EMAIL_MAX_LENGTH), db.ForeignKey(User.email), nullable=True)
   author_email = db.Column(
@@ -169,6 +170,8 @@ def append_fragment(user, old_message, text):
   new_fragments = old_message.fragments.copy()
   new_fragments.append(MessageFragment(text=text, author=user))
   msg = Message(fragments=new_fragments, author=user)
+  # This old message may no longer be appended to.
+  old_message.owner = None
   add(msg)
   commit()
   return msg

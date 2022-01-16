@@ -100,3 +100,37 @@ class RoutesTest(server_test_util.ServerTestCase):
     self.assertTrue(response.is_json)
     self.assertEqual(response.status_code, 400)
     self.assertEqual(response.json, dict(error="No message with id: 123"))
+
+  def test_send_new_message(self):
+    user, token = self.create_test_user("author@gmail.com")
+    response = self.client.post(
+        "/send-message", json=dict(token=token, text="test message"))
+    messages = database.query(database.Message).all()
+    self.assertTrue(response.is_json)
+    self.assertEqual(len(messages), 1)
+    self.assertEqual(messages[0].author, user)
+    self.assertEqual([f.text for f in messages[0].fragments], ["test message"])
+    self.assertTrue(messages[0].owner is None)
+    self.assertTrue("message_id" in response.json)
+    self.assertEqual(messages[0].id, response.json["message_id"])
+    database.refresh(user)
+    self.assertEqual(user.authored_messages, messages)
+
+  def test_send_append_message(self):
+    author, _ = self.create_test_user("author@gmail.com")
+    owner, owner_token = self.create_test_user("owner@gmail.com")
+    database.add(
+        database.Message(
+            id=123,
+            fragments=[database.MessageFragment(text="first", author=author)],
+            author=author,
+            owner=owner))
+    response = self.client.post(
+        "/send-message",
+        json=dict(token=owner_token, message_id=123, text="second"))
+    new_messages = database.query(
+        database.Message).filter(database.Message.id != 123).all()
+    self.assertEqual(len(new_messages), 1)
+    self.assertTrue(response.is_json)
+    self.assertEqual([f.text for f in new_messages[0].fragments],
+                     ["first", "second"])

@@ -133,6 +133,17 @@ class DatabaseTest(server_test_util.ServerTestCase):
     with self.assertRaises(ValueError):
       database.append_fragment(user, msg, text="user isn't owner")
 
+  def test_append_fragment_twice_fails(self):
+    """You should lose permissions after appending a message."""
+    user, _ = self.create_test_user("test@gmail.com")
+    original_msg = database.new_message(user, "first")
+    appender, _ = self.create_test_user("appender@gmail.com")
+    original_msg.owner = appender
+    # This should work without error.
+    database.append_fragment(appender, original_msg, "good append")
+    with self.assertRaises(ValueError):
+      database.append_fragment(appender, original_msg, "bad append")
+
   def test_get_user_from_token(self):
     user, token = self.create_test_user("test@gmail.com")
     self.assertEqual(database.get_user_from_token(token), user)
@@ -238,3 +249,5 @@ class DatabaseTest(server_test_util.ServerTestCase):
     bad_user, _ = self.create_test_user("bad_user@gmail.com")
     with self.assertRaises(ValueError):
       database.get_message(bad_user, message.id)
+
+  # Need to make sure that a message that was appended to doesn't get assigned to anyone.

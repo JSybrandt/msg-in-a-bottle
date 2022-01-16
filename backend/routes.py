@@ -44,10 +44,26 @@ def login():
 
 
 @blueprint.route("/get-message", methods=["GET"])
-def message():
+def get_message():
   data = validate_json_data()
   token = validate_field(data, "token")
   message_id = validate_field(data, "message_id")
   user = database.get_user_from_token(token)
   message = database.get_message(user, message_id)
   return jsonify(message=[f.text for f in message.fragments])
+
+
+@blueprint.route("/send-message", methods=["POST"])
+def send_message():
+  data = validate_json_data()
+  token = validate_field(data, "token")
+  text = validate_field(data, "text")
+  message_id = data.get("message_id")
+  user = database.get_user_from_token(token)
+  if message_id is not None:
+    old_message = database.get_message(user, message_id)
+    new_message = database.append_fragment(user, old_message, text)
+    return jsonify(message_id=new_message.id)
+  else:
+    new_message = database.new_message(user, text)
+    return jsonify(message_id=new_message.id)
