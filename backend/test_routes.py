@@ -215,3 +215,53 @@ class RoutesTest(server_test_util.ServerTestCase):
     self.client.post("/rename", json=dict(token=token, name="Jeff"))
     database.refresh(user)
     self.assertEqual(user.name, "Jeff")
+
+  def test_delete_message(self):
+    user, token = self.create_test_user("test@gmail.com")
+    database.add(database.Message(id=123, author=user))
+    self.client.post("/delete-message", json=dict(token=token, message_id=123))
+    self.assertEqual(database.query(database.Message).all(), [])
+
+  def test_delete_message_bad_msg(self):
+    _, token = self.create_test_user("test@gmail.com")
+    response = self.client.post(
+        "/delete-message", json=dict(token=token, message_id=123))
+    self.assertTrue(response.is_json)
+    self.assertEqual(response.json, dict(error="No message with id: 123"))
+
+  def test_delete_message_bad_user(self):
+    user, token = self.create_test_user("test@gmail.com")
+    database.add(database.Message(id=123, author=user))
+    _, bad_token = self.create_test_user("garbage@gmail.com")
+    response = self.client.post(
+        "/delete-message", json=dict(token=bad_token, message_id=123))
+    self.assertEqual(
+        response.json,
+        dict(
+            error="User garbage@gmail.com does not have permission to view message 123"
+        ))
+
+  def test_delete_message_updates_overview(self):
+    author, _ = self.create_test_user("author@gmail.com")
+    user, token = self.create_test_user("user@gmail.com")
+    database.rename(user, "User Name")
+    user.authored_messages = [
+        database.Message(id=1, author=user),
+        database.Message(id=2, author=user)
+    ]
+    user.may_append_messages = [
+        database.Message(id=3, author=author, may_append_user=user),
+        database.Message(id=4, author=author, may_append_user=user)
+    ]
+    database.commit()
+
+    self.client.post("/delete-message", json=dict(token=token, message_id=2))
+    self.client.post("/delete-message", json=dict(token=token, message_id=3))
+    response = self.client.get("/", json=dict(token=token))
+    self.assertTrue(response.is_json)
+    self.assertEqual(
+        response.json,
+        dict(
+            authored_message_ids=[1],
+            may_append_message_ids=[4],
+            user_name="User Name"))

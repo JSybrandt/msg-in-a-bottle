@@ -99,3 +99,14 @@ def rename():
   user = database.get_user_from_token(token)
   database.rename(user, name)
   return jsonify(dict(status="ok"))
+
+
+@blueprint.route("/delete-message", methods=["POST"])
+def delete_message():
+  data = validate_json_data()
+  token = validate_field(data, "token")
+  message_id = validate_field(data, "message_id")
+  user = database.get_user_from_token(token)
+  message = database.get_message(user, message_id)
+  database.delete_message(user, message)
+  return jsonify(dict(status="ok"))

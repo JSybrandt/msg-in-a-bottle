@@ -25,6 +25,10 @@ def execute(*args, **kwargs):
   return db.session.execute(*args, **kwargs)
 
 
+def delete(*args, **kwargs):
+  return db.session.delete(*args, **kwargs)
+
+
 def refresh(*args, **kwargs):
   return db.session.refresh(*args, **kwargs)
 
@@ -107,12 +111,13 @@ class Message(db.Model):
       User,
       foreign_keys=may_append_email,
       lazy=True,
-      backref=db.backref("may_append_messages", lazy=True))
+      backref=db.backref(
+          "may_append_messages", lazy=True, cascade="all,delete"))
   author = db.relationship(
       User,
       foreign_keys=author_email,
       lazy=True,
-      backref=db.backref("authored_messages", lazy=True))
+      backref=db.backref("authored_messages", lazy=True, cascade="all,delete"))
   timestamp = db.Column(db.DateTime, nullable=False, default=util.now)
 
 
@@ -144,6 +149,18 @@ def close_login_request(email, secret_key):
   attempt_query.delete()
   commit()
   return token
+
+
+def delete_message(user, message):
+  """Removes the message from the database if the user has permissions."""
+  allowed_to_delete = [message.author]
+  if message.may_append_user is not None:
+    allowed_to_delete.append(message.may_append_user)
+  if user not in allowed_to_delete:
+    raise ValueError(f"User {user.email} does not have permissions to delete "
+                     f"message {message.id}")
+  delete(message)
+  commit()
 
 
 def rename(user, name):
