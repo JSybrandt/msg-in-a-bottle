@@ -280,4 +280,11 @@ class DatabaseTest(server_test_util.ServerTestCase):
     msg_2 = database.new_message(author, "msg 2")
     self.assertFalse(database.allowed_to_recieve_msg(user))
 
+  def test_rename(self):
+    user, _ = self.create_test_user("user@gmail.com")
+    self.assertTrue(user.name is None)
+    database.rename(user, "Jeff")
+    database.refresh(user)
+    self.assertEqual(user.name, "Jeff")
+
   # Need to make sure that a message that was appended to doesn't get assigned to anyone.

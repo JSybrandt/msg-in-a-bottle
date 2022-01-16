@@ -44,6 +44,7 @@ VALID_TOKEN_DELTA = timedelta(days=10)
 NEW_MESSAGE_MIN_DELTA = timedelta(days=1)
 
 EMAIL_MAX_LENGTH = 120
+NAME_MAX_LENGTH = 50
 
 # Defines a many-to-many relationship between messages and fragments.
 message_to_fragment_table = db.Table(
@@ -60,6 +61,7 @@ message_to_fragment_table = db.Table(
 
 class User(db.Model):
   email = db.Column(db.String(EMAIL_MAX_LENGTH), primary_key=True)
+  name = db.Column(db.String(NAME_MAX_LENGTH), nullable=True)
   coordinate_x = db.Column(db.Float, nullable=False, default=random.random)
   coordinate_y = db.Column(db.Float, nullable=False, default=random.random)
   creation_timestamp = db.Column(db.DateTime, nullable=False, default=util.now)
@@ -141,6 +143,12 @@ def close_login_request(email, secret_key):
   attempt_query.delete()
   commit()
   return token
+
+
+def rename(user, name):
+  """Sets the user's name."""
+  user.name = name
+  commit()
 
 
 def get_user_from_token(token):

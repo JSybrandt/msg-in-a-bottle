@@ -74,11 +74,14 @@ class RoutesTest(server_test_util.ServerTestCase):
 
   def test_get_message(self):
     user, token = self.create_test_user("author@gmail.com")
+    database.rename(user, "Author")
     message = database.new_message(user, "test message")
     response = self.client.get(
         "/get-message", json=dict(token=token, message_id=message.id))
     self.assertTrue(response.is_json)
-    self.assertEqual(response.json, dict(message=["test message"]))
+    self.assertEqual(
+        response.json,
+        dict(message=[dict(text="test message", author_name="Author")]))
 
   def test_get_message_bad_user(self):
     user, _ = self.create_test_user("author@gmail.com")
@@ -184,7 +187,7 @@ class RoutesTest(server_test_util.ServerTestCase):
     database.refresh(user)
     self.assertEqual(user.may_append_messages, [new_msg])
 
-  def test_get_overview_does_not_assign_msg_too_Freq(self):
+  def test_get_overview_does_not_assign_msg_too_freq(self):
     author, _ = self.create_test_user("author@gmail.com")
     new_msg = database.new_message(author, "test message")
     user, token = self.create_test_user("user@gmail.com")
@@ -196,3 +199,10 @@ class RoutesTest(server_test_util.ServerTestCase):
     self.assertTrue(response.is_json)
     self.assertEqual(response.json,
                      dict(authored_message_ids=[], may_append_message_ids=[]))
+
+  def test_rename(self):
+    user, token = self.create_test_user("test@gmail.com")
+    self.assertTrue(user.name is None)
+    self.client.post("/rename", json=dict(token=token, name="Jeff"))
+    database.refresh(user)
+    self.assertEqual(user.name, "Jeff")

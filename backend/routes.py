@@ -50,7 +50,10 @@ def get_message():
   message_id = validate_field(data, "message_id")
   user = database.get_user_from_token(token)
   message = database.get_message(user, message_id)
-  return jsonify(message=[f.text for f in message.fragments])
+  fragments = [
+      dict(text=f.text, author_name=f.author.name) for f in message.fragments
+  ]
+  return jsonify(message=fragments)
 
 
 @blueprint.route("/send-message", methods=["POST"])
@@ -84,3 +87,13 @@ def overview():
   return jsonify(
       authored_message_ids=authored_message_ids,
       may_append_message_ids=may_append_message_ids)
+
+
+@blueprint.route("/rename", methods=["POST"])
+def rename():
+  data = validate_json_data()
+  token = validate_field(data, "token")
+  name = validate_field(data, "name")
+  user = database.get_user_from_token(token)
+  database.rename(user, name)
+  return jsonify(dict(status="ok"))
