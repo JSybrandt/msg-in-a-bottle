@@ -9,9 +9,16 @@ import { AppComponent } from './app.component';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { LoginComponent } from './login/login.component';
+import { SplashscreenComponent } from './splashscreen/splashscreen.component';
+import { MainscreenComponent } from './mainscreen/mainscreen.component';
 
 @NgModule({
-  declarations: [AppComponent, LoginComponent],
+  declarations: [
+    AppComponent,
+    LoginComponent,
+    SplashscreenComponent,
+    MainscreenComponent,
+  ],
   imports: [
     BrowserModule,
     AppRoutingModule,
