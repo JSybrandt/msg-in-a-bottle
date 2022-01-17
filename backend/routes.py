@@ -20,12 +20,12 @@ def validate_field(json_data, field_name):
 
 @blueprint.errorhandler(ValueError)
 def value_error(e):
-  return jsonify(error=str(e)), 400
+  return jsonify(status=str(e)), 400
 
 
 @blueprint.errorhandler(AssertionError)
 def value_error(e):
-  return jsonify(error=str(e)), 500
+  return jsonify(status=str(e)), 500
 
 
 @blueprint.route("/login", methods=["POST"])
@@ -38,10 +38,10 @@ def login():
     mail.send_mail(
         "Message in a Bottle: Secret Key",
         f"Your secret key is: {new_key}.\nIt is valid for 10 minutes.", [email])
-    return jsonify(status="new-login")
+    return jsonify(status="ok")
   else:
     token = database.close_login_request(email, secret_key)
-    return jsonify(status="login-success", token=token)
+    return jsonify(status="ok", token=token)
 
 
 @blueprint.route("/get-message", methods=["GET"])
@@ -54,7 +54,7 @@ def get_message():
   fragments = [
       dict(text=f.text, author_name=f.author.name) for f in message.fragments
   ]
-  return jsonify(message=fragments)
+  return jsonify(status="ok", message=fragments)
 
 
 @blueprint.route("/send-message", methods=["POST"])
@@ -67,10 +67,10 @@ def send_message():
   if message_id is not None:
     old_message = database.get_message(user, message_id)
     new_message = database.append_fragment(user, old_message, text)
-    return jsonify(message_id=new_message.id)
+    return jsonify(status="ok", message_id=new_message.id)
   else:
     new_message = database.new_message(user, text)
-    return jsonify(message_id=new_message.id)
+    return jsonify(status="ok", message_id=new_message.id)
 
 
 @blueprint.route("/", methods=["GET"])
@@ -86,6 +86,7 @@ def overview():
   authored_message_ids = [m.id for m in user.authored_messages]
   may_append_message_ids = [m.id for m in user.may_append_messages]
   return jsonify(
+      status="ok",
       authored_message_ids=authored_message_ids,
       may_append_message_ids=may_append_message_ids,
       user_name=user.name)
@@ -98,7 +99,7 @@ def rename():
   name = validate_field(data, "name")
   user = database.get_user_from_token(token)
   database.rename(user, name)
-  return jsonify(dict(status="ok"))
+  return jsonify(status="ok")
 
 
 @blueprint.route("/delete-message", methods=["POST"])
@@ -109,4 +110,4 @@ def delete_message():
   user = database.get_user_from_token(token)
   message = database.get_message(user, message_id)
   database.delete_message(user, message)
-  return jsonify(dict(status="ok"))
+  return jsonify(status="ok")

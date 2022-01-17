@@ -11,20 +11,20 @@ class RoutesTest(server_test_util.ServerTestCase):
     self.assertEqual(response.status_code, 400)
     self.assertTrue(response.is_json)
     self.assertEqual(response.json,
-                     dict(error="Expected request to be json encoded."))
+                     dict(status="Expected request to be json encoded."))
 
   def test_login_json_empty(self):
     response = self.client.post("/login", json={})
     self.assertEqual(response.status_code, 400)
     self.assertTrue(response.is_json)
-    self.assertEqual(response.json, dict(error="Expected 'email' value."))
+    self.assertEqual(response.json, dict(status="Expected 'email' value."))
 
   def test_login_w_email_no_key(self):
     email = "test@gmail.com"
     response = self.client.post("/login", json={"email": email})
     self.assertEqual(response.status_code, 200)
     self.assertTrue(response.is_json)
-    self.assertEqual(response.json, dict(status="new-login"))
+    self.assertEqual(response.json, dict(status="ok"))
     self.assertEqual(
         database.db.session.query(database.PendingLoginRequest).count(), 1)
     # Check mailtrap, we should have spammed an email.
@@ -40,7 +40,7 @@ class RoutesTest(server_test_util.ServerTestCase):
     self.assertTrue(response.is_json)
     self.assertEqual(response.status_code, 200)
     self.assertIn("status", response.json)
-    self.assertEqual(response.json["status"], "login-success")
+    self.assertEqual(response.json["status"], "ok")
     self.assertIn("token", response.json)
     self.assertEqual(
         database.db.session.query(database.PendingLoginRequest).count(), 0)
@@ -57,7 +57,7 @@ class RoutesTest(server_test_util.ServerTestCase):
         "/login", json=dict(email=email, secret_key="garbge"))
     self.assertTrue(response.is_json)
     self.assertEqual(response.status_code, 400)
-    self.assertEqual(response.json, dict(error="Invalid secret key"))
+    self.assertEqual(response.json, dict(status="Invalid secret key"))
 
   def test_login_w_email_timeout(self):
     email = "test@gmail.com"
@@ -70,7 +70,7 @@ class RoutesTest(server_test_util.ServerTestCase):
         "/login", json=dict(email=email, secret_key=secret_key))
     self.assertTrue(response.is_json)
     self.assertEqual(response.status_code, 400)
-    self.assertEqual(response.json, dict(error="Invalid secret key"))
+    self.assertEqual(response.json, dict(status="Invalid secret key"))
 
   def test_get_message(self):
     user, token = self.create_test_user("author@gmail.com")
@@ -81,7 +81,9 @@ class RoutesTest(server_test_util.ServerTestCase):
     self.assertTrue(response.is_json)
     self.assertEqual(
         response.json,
-        dict(message=[dict(text="test message", author_name="Author")]))
+        dict(
+            status="ok",
+            message=[dict(text="test message", author_name="Author")]))
 
   def test_get_message_bad_user(self):
     user, _ = self.create_test_user("author@gmail.com")
@@ -93,7 +95,7 @@ class RoutesTest(server_test_util.ServerTestCase):
     self.assertEqual(response.status_code, 400)
     self.assertEqual(
         response.json,
-        dict(error="User bad_user@gmail.com does not have permission to view "
+        dict(status="User bad_user@gmail.com does not have permission to view "
              f"message {message.id}"))
 
   def test_get_message_bad_id(self):
@@ -102,7 +104,7 @@ class RoutesTest(server_test_util.ServerTestCase):
         "/get-message", json=dict(token=token, message_id=123))
     self.assertTrue(response.is_json)
     self.assertEqual(response.status_code, 400)
-    self.assertEqual(response.json, dict(error="No message with id: 123"))
+    self.assertEqual(response.json, dict(status="No message with id: 123"))
 
   def test_send_new_message(self):
     user, token = self.create_test_user("author@gmail.com")
@@ -152,7 +154,7 @@ class RoutesTest(server_test_util.ServerTestCase):
     self.assertEqual(
         response.json,
         dict(
-            error="User may_append_user@gmail.com does not have permission to view "
+            status="User may_append_user@gmail.com does not have permission to view "
             "message 123"))
 
   def test_get_overview(self):
@@ -174,6 +176,7 @@ class RoutesTest(server_test_util.ServerTestCase):
     self.assertEqual(
         response.json,
         dict(
+            status="ok",
             authored_message_ids=[1, 2],
             may_append_message_ids=[3, 4],
             user_name="User Name"))
@@ -188,6 +191,7 @@ class RoutesTest(server_test_util.ServerTestCase):
     self.assertEqual(
         response.json,
         dict(
+            status="ok",
             authored_message_ids=[],
             may_append_message_ids=[new_msg.id],
             user_name=None))
@@ -207,7 +211,10 @@ class RoutesTest(server_test_util.ServerTestCase):
     self.assertEqual(
         response.json,
         dict(
-            authored_message_ids=[], may_append_message_ids=[], user_name=None))
+            status="ok",
+            authored_message_ids=[],
+            may_append_message_ids=[],
+            user_name=None))
 
   def test_rename(self):
     user, token = self.create_test_user("test@gmail.com")
@@ -227,7 +234,7 @@ class RoutesTest(server_test_util.ServerTestCase):
     response = self.client.post(
         "/delete-message", json=dict(token=token, message_id=123))
     self.assertTrue(response.is_json)
-    self.assertEqual(response.json, dict(error="No message with id: 123"))
+    self.assertEqual(response.json, dict(status="No message with id: 123"))
 
   def test_delete_message_bad_user(self):
     user, token = self.create_test_user("test@gmail.com")
@@ -238,7 +245,7 @@ class RoutesTest(server_test_util.ServerTestCase):
     self.assertEqual(
         response.json,
         dict(
-            error="User garbage@gmail.com does not have permission to view message 123"
+            status="User garbage@gmail.com does not have permission to view message 123"
         ))
 
   def test_delete_message_updates_overview(self):
@@ -262,6 +269,7 @@ class RoutesTest(server_test_util.ServerTestCase):
     self.assertEqual(
         response.json,
         dict(
+            status="ok",
             authored_message_ids=[1],
             may_append_message_ids=[4],
             user_name="User Name"))
