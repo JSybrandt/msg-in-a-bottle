@@ -31,7 +31,14 @@ export class LoginService {
     headers: new HttpHeaders({ 'Content-Type': 'application/json' }),
   };
 
-  constructor(private http: HttpClient) {}
+  private storage = window.localStorage;
+
+  constructor(private http: HttpClient) {
+    let saved_token = this.storage.getItem('token');
+    if (saved_token) {
+      this.token = saved_token;
+    }
+  }
 
   getLoginState(): LoginState {
     if (this.token !== undefined) {
@@ -76,6 +83,7 @@ export class LoginService {
         map((response, _) => {
           if (response.status === kOkStatus) {
             this.token = response.token;
+            this.storage.setItem('token', this.token!);
           }
           return response.status;
         })
