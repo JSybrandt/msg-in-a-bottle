@@ -1,0 +1,33 @@
+<div id="login">
+  <h2>Login!</h2>
+
+  <p>
+    Welcome to Message in a Bottle! To get started you'll need to login with an
+    email address.
+  </p>
+
+  <div *ngIf="isNotLoggedIn()">
+    <label for="email">Email:</label>
+    <input
+      id="email"
+      [(ngModel)]="email"
+      type="email"
+      (keyup.enter)="submit()"
+    />
+  </div>
+
+  <div *ngIf="isPendingLogin()">
+    <p>Email: {{ email }}</p>
+    <label for="secret-key">Secret Key:</label>
+    <input id="secret-key" [(ngModel)]="secret_key" (keyup.enter)="submit()" />
+    <button id="cancel" (click)="cancelLogin()">Cancel</button>
+  </div>
+
+  <button id="submit" (click)="submit()">Submit</button>
+
+  <mat-progress-spinner
+    *ngIf="waiting"
+    color="accent"
+    mode="indeterminate"
+  ></mat-progress-spinner>
+</div>
