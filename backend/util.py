@@ -2,6 +2,7 @@ import string
 import random
 import datetime
 import time
+import re
 
 SECRET_KEY_LENGTH = 6
 SECRET_KEY_CHARS = string.ascii_uppercase + string.digits
@@ -26,3 +27,10 @@ def now():
 
 def new_id():
   return time.time_ns()
+
+
+_EMAIL_REGEX = re.compile(r"(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)")
+
+def is_valid_email(email):
+  return _EMAIL_REGEX.fullmatch(email)
+

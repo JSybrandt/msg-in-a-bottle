@@ -347,3 +347,11 @@ class DatabaseTest(server_test_util.ServerTestCase):
     database.delete_message(author, message)
     with self.assertRaises(ValueError):
       database.get_message(author, message.id)
+
+  def test_login_requires_real_email(self):
+    with self.assertRaises(ValueError):
+      database.open_login_request(email="garbage")
+
+  def test_close_requires_real_email(self):
+    with self.assertRaises(ValueError):
+      database.close_login_request(email="garbage", secret_key="1234")

@@ -123,6 +123,8 @@ class Message(db.Model):
 
 def open_login_request(email):
   """Returns a secret key that the user can use to login."""
+  if not util.is_valid_email(email):
+    raise ValueError(f"'{email}' is not a valid email address.")
   secret_key = util.generate_secret_key()
   existing_query = query(PendingLoginRequest).filter(
       PendingLoginRequest.email == email)
@@ -136,6 +138,8 @@ def open_login_request(email):
 
 def close_login_request(email, secret_key):
   """Returns a token if the secret key is valid for the email."""
+  if not util.is_valid_email(email):
+    raise ValueError(f"'{email}' is not a valid email address.")
   attempt_query = query(PendingLoginRequest).filter(
       PendingLoginRequest.email == email,
       PendingLoginRequest.secret_key == secret_key.upper(),
@@ -191,9 +195,8 @@ def new_message(user, text):
 def append_fragment(user, old_message, text):
   """Adds new message with a new fragment appended. Returns new msg."""
   if old_message.may_append_user != user:
-    raise ValueError(
-        f"User {user.email} is not the may_append_user of message: {old_message.id}"
-    )
+    raise ValueError(f"User {user.email} is not the may_append_user of "
+                     f"message: {old_message.id}")
   new_fragments = old_message.fragments.copy()
   new_fragments.append(MessageFragment(text=text, author=user))
   msg = Message(fragments=new_fragments, author=user)
