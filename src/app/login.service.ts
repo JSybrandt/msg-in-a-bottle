@@ -25,6 +25,7 @@ export class LoginService {
   // Set after login started.
   private email?: string;
   private token?: string;
+  private storageTokenKey: string = 'token';
 
   private loginUrl: string = `${kBackendRootUrl}/login`;
   private httpOptions = {
@@ -34,7 +35,7 @@ export class LoginService {
   private storage = window.localStorage;
 
   constructor(private http: HttpClient) {
-    let saved_token = this.storage.getItem('token');
+    let saved_token = this.storage.getItem(this.storageTokenKey);
     if (saved_token) {
       this.token = saved_token;
     }
@@ -83,7 +84,7 @@ export class LoginService {
         map((response, _) => {
           if (response.status === kOkStatus) {
             this.token = response.token;
-            this.storage.setItem('token', this.token!);
+            this.storage.setItem(this.storageTokenKey, this.token!);
           }
           return response.status;
         })
@@ -93,6 +94,7 @@ export class LoginService {
   logout(): void {
     this.email = undefined;
     this.token = undefined;
+    this.storage.removeItem(this.storageTokenKey);
   }
 
   getEmail(): string | undefined {
@@ -105,6 +107,6 @@ export class LoginService {
 
   private handleError(response: any): Observable<LoginResponse> {
     console.log(response.message);
-    return of({ status: response.error.status });
+    return of(response.error);
   }
 }

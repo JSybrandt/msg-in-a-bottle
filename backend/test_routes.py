@@ -76,7 +76,7 @@ class RoutesTest(server_test_util.ServerTestCase):
     user, token = self.create_test_user("author@gmail.com")
     database.rename(user, "Author")
     message = database.new_message(user, "test message")
-    response = self.client.get(
+    response = self.client.post(
         "/get-message", json=dict(token=token, message_id=message.id))
     self.assertTrue(response.is_json)
     self.assertEqual(
@@ -89,7 +89,7 @@ class RoutesTest(server_test_util.ServerTestCase):
     user, _ = self.create_test_user("author@gmail.com")
     bad_user, bad_token = self.create_test_user("bad_user@gmail.com")
     message = database.new_message(user, "test message")
-    response = self.client.get(
+    response = self.client.post(
         "/get-message", json=dict(token=bad_token, message_id=message.id))
     self.assertTrue(response.is_json)
     self.assertEqual(response.status_code, 400)
@@ -100,7 +100,7 @@ class RoutesTest(server_test_util.ServerTestCase):
 
   def test_get_message_bad_id(self):
     user, token = self.create_test_user("author@gmail.com")
-    response = self.client.get(
+    response = self.client.post(
         "/get-message", json=dict(token=token, message_id=123))
     self.assertTrue(response.is_json)
     self.assertEqual(response.status_code, 400)
@@ -171,7 +171,7 @@ class RoutesTest(server_test_util.ServerTestCase):
     ]
     database.commit()
 
-    response = self.client.get("/", json=dict(token=token))
+    response = self.client.post("/", json=dict(token=token))
     self.assertTrue(response.is_json)
     self.assertEqual(
         response.json,
@@ -186,7 +186,7 @@ class RoutesTest(server_test_util.ServerTestCase):
     new_msg = database.new_message(author, "test message")
     user, token = self.create_test_user("user@gmail.com")
     self.assertTrue(database.allowed_to_recieve_msg(user))
-    response = self.client.get("/", json=dict(token=token))
+    response = self.client.post("/", json=dict(token=token))
     self.assertTrue(response.is_json)
     self.assertEqual(
         response.json,
@@ -206,7 +206,7 @@ class RoutesTest(server_test_util.ServerTestCase):
     user.last_msg_received_timestamp = util.now()
     database.commit()
     self.assertFalse(database.allowed_to_recieve_msg(user))
-    response = self.client.get("/", json=dict(token=token))
+    response = self.client.post("/", json=dict(token=token))
     self.assertTrue(response.is_json)
     self.assertEqual(
         response.json,
@@ -264,7 +264,7 @@ class RoutesTest(server_test_util.ServerTestCase):
 
     self.client.post("/delete-message", json=dict(token=token, message_id=2))
     self.client.post("/delete-message", json=dict(token=token, message_id=3))
-    response = self.client.get("/", json=dict(token=token))
+    response = self.client.post("/", json=dict(token=token))
     self.assertTrue(response.is_json)
     self.assertEqual(
         response.json,

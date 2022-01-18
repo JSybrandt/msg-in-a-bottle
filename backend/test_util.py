@@ -1,7 +1,9 @@
 import util
 import unittest
 
+
 class UtilTest(unittest.TestCase):
+
   def test_valid_email(self):
     self.assertTrue(util.is_valid_email("justin@sybrandt.com"))
     self.assertTrue(util.is_valid_email("justin.sybrandt@gmail.com"))

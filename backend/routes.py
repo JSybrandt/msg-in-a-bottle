@@ -44,7 +44,7 @@ def login():
     return jsonify(status="ok", token=token)
 
 
-@blueprint.route("/get-message", methods=["GET"])
+@blueprint.route("/get-message", methods=["POST"])
 def get_message():
   data = validate_json_data()
   token = validate_field(data, "token")
@@ -73,7 +73,7 @@ def send_message():
     return jsonify(status="ok", message_id=new_message.id)
 
 
-@blueprint.route("/", methods=["GET"])
+@blueprint.route("/", methods=["POST"])
 def overview():
   data = validate_json_data()
   token = validate_field(data, "token")

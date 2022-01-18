@@ -179,7 +179,7 @@ def get_user_from_token(token):
       AccessToken.token == token,
       AccessToken.timestamp > util.now() - VALID_TOKEN_DELTA).first()
   if access_token is None:
-    raise ValueError(f"Invalid API token: {token}")
+    raise ValueError(f"Invalid API token.")
   return access_token.user
 
 
